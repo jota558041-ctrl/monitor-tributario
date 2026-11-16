@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+certificados/
+backups/
+
+# Artefatos de teste
+e2e/capturas/
+.pytest_cache/
+.ruff_cache/
+frontend/tsconfig.tsbuildinfo

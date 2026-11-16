@@ -1,0 +1,17 @@
+line-length = 100
+target-version = "py311"
+exclude = ["alembic/versions"]
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+  "E501",   # comprimento tratado pelo formatador
+  "B008",   # Depends() em assinatura é o padrão do FastAPI
+  "SIM108", # ternário nem sempre é mais legível aqui
+  "SIM102", # ifs aninhados são mantidos quando o interno carrega comentário explicativo
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E402"]
+"scripts/*" = ["E402"]
+"alembic/env.py" = ["E402"]

@@ -1,0 +1,16 @@
+﻿CNPJ;Razão Social;Nome Fantasia;E-mail;Responsável pelo cliente;Número da Procuração;Data de Validade da Procuração;Tributos Trabalhados;Número da PER/DCOMP;Valor da Compensação;Data da Operação;Período de Apuração;Situação da Compensação
+10.000.001/0001-90;Alfa Indústria de Alimentos Ltda;Alfa Alimentos;fiscal@alfaalimentos.com.br;Ana Souza;PROC-2025-0001;02/10/2027;PIS;41234.56789.010125.1.3.04-1001;185000,00;20/04/2026;01/2024;Transmitida
+10.000.001/0001-90;Alfa Indústria de Alimentos Ltda;Alfa Alimentos;fiscal@alfaalimentos.com.br;Ana Souza;PROC-2025-0001;02/10/2027;COFINS;41234.56789.020125.1.3.04-1002;92500,00;20/05/2026;02/2024;
+10.000.002/0001-34;Beta Comércio de Peças S.A.;Beta Peças;fiscal@betapeças.com.br;Bruno Lima;PROC-2025-0002;11/12/2026;IRPJ;41234.56789.030125.1.3.04-2001;64000,00;19/06/2026;03/2024;Em análise
+10.000.003/0001-89;Gama Transportes Rodoviários Ltda;Gama Log;fiscal@gamalog.com.br;Carla Dias;PROC-2025-0003;01/11/2026;CPP;41234.56789.040125.1.3.04-3001;47300,00;19/07/2026;04/2024;Transmitida
+10.000.004/0001-23;Delta Serviços de Engenharia Ltda;Delta Eng;fiscal@deltaeng.com.br;Bruno Lima;PROC-2025-0004;15/05/2027;IRPJ;41234.56789.050125.1.3.04-4001;28900,00;08/08/2026;05/2024;
+10.000.005/0001-78;Épsilon Varejo e Distribuição Ltda;Épsilon Varejo;fiscal@epsilonvarejo.com.br;Ana Souza;PROC-2025-0005;19/02/2027;COFINS;41234.56789.060125.1.3.04-5001;156400,00;13/08/2026;06/2024;Transmitida
+10.000.006/0001-12;Zeta Agropecuária Ltda;Zeta Agro;fiscal@zetaagro.com.br;Carla Dias;PROC-2025-0006;15/01/2027;FUNRURAL;41234.56789.070125.1.3.04-6001;73200,00;23/08/2026;07/2024;
+10.000.007/0001-67;Eta Metalúrgica do Brasil Ltda;Eta Metal;fiscal@etametal.com.br;Daniel Rocha;PROC-2025-0007;14/07/2027;IPI;41234.56789.080125.1.3.04-7001;310000,00;01/03/2026;08/2024;Transmitida
+10.000.007/0001-67;Eta Metalúrgica do Brasil Ltda;Eta Metal;fiscal@etametal.com.br;Daniel Rocha;PROC-2025-0007;14/07/2027;PIS;41234.56789.090125.1.3.04-7002;58000,00;31/03/2026;09/2024;Em análise
+10.000.008/0001-01;Teta Tecnologia e Sistemas Ltda;Teta Tech;fiscal@tetatech.com.br;Daniel Rocha;PROC-2025-0008;28/11/2026;CSLL;41234.56789.100125.1.3.04-8001;41500,00;02/09/2026;10/2024;Transmitida
+10.000.009/0001-56;Iota Construtora e Incorporadora Ltda;Iota Obras;fiscal@iotaobras.com.br;Ana Souza;PROC-2025-0009;21/12/2027;CPRB;41234.56789.110125.1.3.04-9001;98700,00;12/09/2026;11/2024;
+10.000.009/0001-56;Iota Construtora e Incorporadora Ltda;Iota Obras;fiscal@iotaobras.com.br;Ana Souza;PROC-2025-0009;21/12/2027;IRPJ;41234.56789.120125.1.3.04-9002;22150,00;07/10/2026;12/2024;Transmitida
+10.000.010/0001-80;Kappa Química Industrial Ltda;Kappa Química;fiscal@kappaquímica.com.br;Carla Dias;PROC-2025-0010;15/04/2027;COFINS;41234.56789.130125.1.3.04-1101;134900,00;17/10/2026;01/2025;
+11.111.111/1111-11;Empresa CNPJ Inválido Ltda;Teste Erro;sem-arroba.com.br;Ana Souza;PROC-2025-9999;12/10/2025;PIS;41234.56789.999999.1.3.04-0000;1000,00;06/11/2026;01/2024;Situação Estranha
+10.000.001/0001-90;Alfa Indústria de Alimentos Ltda;Alfa Alimentos;fiscal@alfaalimentos.com.br;Ana Souza;PROC-2025-0001;02/10/2027;PIS;41234.56789.010125.1.3.04-1001;185000,00;20/04/2026;01/2024;Transmitida
