@@ -128,6 +128,37 @@ async function requisicao<T>(caminho: string, opcoes: Opcoes = {}): Promise<T> {
   return (await resposta.json()) as T;
 }
 
+/** Baixa um arquivo da API respeitando o token (fetch + blob + <a download>). */
+export async function baixarArquivo(caminho: string, params?: Record<string, unknown>) {
+  const url = new URL(`/api${caminho}`, window.location.origin);
+  Object.entries(params ?? {}).forEach(([chave, valor]) => {
+    if (valor !== undefined && valor !== null && valor !== "") url.searchParams.set(chave, String(valor));
+  });
+  const resposta = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${obterToken() ?? ""}` },
+  });
+  if (!resposta.ok) {
+    let detalhe = `Erro ${resposta.status} ao gerar o arquivo`;
+    try {
+      const dados = await resposta.json();
+      if (typeof dados.detail === "string") detalhe = dados.detail;
+    } catch { /* resposta não-JSON */ }
+    throw new ErroApi(resposta.status, detalhe);
+  }
+  const disposicao = resposta.headers.get("content-disposition") ?? "";
+  const encontrado = /filename="?([^";]+)"?/.exec(disposicao);
+  const nome = encontrado ? encontrado[1] : caminho.split("/").pop() ?? "arquivo";
+  const blob = await resposta.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+  return nome;
+}
+
 export const api = {
   get: <T,>(caminho: string, params?: Record<string, unknown>) => requisicao<T>(caminho, { params }),
   post: <T,>(caminho: string, corpo?: unknown, params?: Record<string, unknown>) =>

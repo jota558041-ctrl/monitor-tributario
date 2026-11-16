@@ -4,7 +4,8 @@ import {
   Acoes, Aviso, Campo, Cartao, Carregando, Definicoes, Modal, PontoSemaforo, Selo, Vazio,
 } from "../componentes/ui";
 import {
-  Alerta, Cliente, Comparativo, Compensacao, Pagina, Procuracao, Snapshot, api, obterUsuario,
+  Alerta, Cliente, Comparativo, Compensacao, Pagina, Procuracao, Snapshot, api, baixarArquivo,
+  obterUsuario,
 } from "../lib/api";
 import {
   COR_CRITICIDADE, COR_DISPONIBILIDADE, COR_SITUACAO_COMPENSACAO, COR_SITUACAO_FISCAL,
@@ -154,6 +155,19 @@ export default function ClienteDetalhe() {
         descricao={`${cliente.cnpj_formatado ?? fmtCnpj(cliente.cnpj)} · ${cliente.nome_fantasia ?? "sem nome fantasia"}`}
         acoes={
           <>
+            <button className="pequeno" disabled={ocupado} onClick={async () => {
+              setOcupado(true);
+              try { await baixarArquivo(`/relatorios/cliente/${id}.pdf`); }
+              catch (e) { setErro(e instanceof Error ? e.message : "Falha ao gerar PDF."); }
+              finally { setOcupado(false); }
+            }}>Posição em PDF</button>
+            <button className="pequeno" disabled={ocupado} onClick={async () => {
+              setOcupado(true);
+              try { await baixarArquivo("/relatorios/consultas.xlsx",
+                { cliente_id: id, dias: 180 }); }
+              catch (e) { setErro(e instanceof Error ? e.message : "Falha ao gerar extrato."); }
+              finally { setOcupado(false); }
+            }}>Extrato de consultas</button>
             <button className="pequeno" onClick={abrirEdicaoCliente}>Editar cliente</button>
             <button className="primario pequeno" onClick={consultarTudo} disabled={ocupado}>
               {ocupado ? <span className="carregando" /> : null} Consultar agora

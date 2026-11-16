@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Aviso, Cartao, Carregando, Selo, Vazio } from "../componentes/ui";
-import { api, obterToken } from "../lib/api";
+import { api, baixarArquivo } from "../lib/api";
 import { brl, data, rotulo } from "../lib/formato";
 
 interface Linha {
@@ -87,14 +87,11 @@ export default function Importacao() {
   }
 
   async function baixarModelo() {
-    const resposta = await fetch("/api/importacoes/modelo", {
-      headers: { Authorization: `Bearer ${obterToken()}` },
-    });
-    const blob = await resposta.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = "modelo-importacao.xlsx"; link.click();
-    URL.revokeObjectURL(url);
+    try {
+      await baixarArquivo("/importacoes/modelo");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao baixar o modelo.");
+    }
   }
 
   const resumo = (importacao?.resumo ?? {}) as Record<string, number>;

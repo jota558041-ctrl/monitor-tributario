@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Aviso, Cartao, Carregando, Modal, Paginacao, Selo, Vazio } from "../componentes/ui";
-import { Alerta, Pagina, api } from "../lib/api";
+import { Alerta, Pagina, api, baixarArquivo } from "../lib/api";
 import { COR_CRITICIDADE, dataHora, rotulo } from "../lib/formato";
 
 export default function Alertas() {
@@ -51,7 +51,15 @@ export default function Alertas() {
         </div>
       </Cartao>
 
-      <Cartao titulo="Ocorrências" semPadding>
+      <Cartao titulo="Ocorrências" semPadding
+              acoes={<button className="pequeno" onClick={async () => {
+                try {
+                  await baixarArquivo("/relatorios/alertas.xlsx",
+                    { dias: 180, status: filtros.status });
+                } catch (e) {
+                  setErro(e instanceof Error ? e.message : "Falha ao exportar.");
+                }
+              }}>Exportar relação (Excel)</button>}>
         <div className="filtros" style={{ padding: 16, borderBottom: "1px solid var(--cinza-100)" }}>
           <div className="campo">
             <label>Status</label>

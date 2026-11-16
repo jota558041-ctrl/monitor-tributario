@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Acoes, Aviso, Campo, Cartao, Carregando, Modal, Paginacao, Selo, Vazio,
 } from "../componentes/ui";
-import { Cliente, Pagina, api } from "../lib/api";
+import { Cliente, Pagina, api, baixarArquivo } from "../lib/api";
 import { cnpj as fmtCnpj, dataHora } from "../lib/formato";
 
 const CLIENTE_VAZIO = {
@@ -64,6 +64,15 @@ export default function Clientes() {
       semPadding
       acoes={
         <>
+          <button className="pequeno" disabled={salvando} onClick={async () => {
+            setSalvando(true);
+            try {
+              const nome = await baixarArquivo("/relatorios/carteira.xlsx", { responsavel });
+              setMensagem(`Relatório gerado: ${nome}`);
+            } catch (e) {
+              setErro(e instanceof Error ? e.message : "Falha ao gerar relatório.");
+            } finally { setSalvando(false); }
+          }}>Exportar carteira (Excel)</button>
           <button className="pequeno" onClick={() => navegar("/importacao")}>Importar planilha</button>
           <button className="primario pequeno" onClick={() => setCriando(true)}>Novo cliente</button>
         </>

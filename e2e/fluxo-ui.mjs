@@ -301,6 +301,35 @@ await etapa("gestão de usuários disponível ao administrador", async () => {
   await capturar("19-usuarios");
 });
 
+await etapa("exporta a carteira em Excel pela interface", async () => {
+  await pagina.locator(".nav-item").filter({ hasText: "Clientes" }).first().click();
+  await pagina.waitForSelector("tbody tr");
+  const [download] = await Promise.all([
+    pagina.waitForEvent("download", { timeout: 60000 }),
+    pagina.getByRole("button", { name: "Exportar carteira (Excel)" }).click(),
+  ]);
+  const nome = download.suggestedFilename();
+  confirmar(nome.startsWith("carteira-") && nome.endsWith(".xlsx"), `arquivo inesperado: ${nome}`);
+  const caminho = await download.path();
+  confirmar(Boolean(caminho), "download não foi concluído");
+  await capturar("20-exportacao-carteira");
+});
+
+await etapa("gera a posição do cliente em PDF", async () => {
+  await pagina.locator("tbody tr").first().click();
+  await pagina.waitForSelector("text=Procurações eletrônicas");
+  const [download] = await Promise.all([
+    pagina.waitForEvent("download", { timeout: 60000 }),
+    pagina.getByRole("button", { name: "Posição em PDF" }).click(),
+  ]);
+  const nome = download.suggestedFilename();
+  confirmar(nome.startsWith("posicao-") && nome.endsWith(".pdf"), `arquivo inesperado: ${nome}`);
+  const { readFileSync } = await import("node:fs");
+  const caminho = await download.path();
+  const cabecalho = readFileSync(caminho).subarray(0, 5).toString();
+  confirmar(cabecalho === "%PDF-", `conteúdo não é PDF: ${cabecalho}`);
+});
+
 await etapa("sem erros de console no fluxo", async () => {
   const relevantes = errosConsole.filter((e) => !e.includes("favicon"));
   confirmar(relevantes.length === 0, `erros de console: ${relevantes.join(" | ")}`);
