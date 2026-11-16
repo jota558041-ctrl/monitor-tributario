@@ -25,6 +25,26 @@ mkdirSync(CAPTURAS, { recursive: true });
 const resultados = [];
 let falhas = 0;
 
+/** Gera um CNPJ matematicamente válido (módulo 11) a partir de uma base. */
+function gerarCnpj(base) {
+  const raiz = String(base % 100000000).padStart(8, "0") + "0001";
+  const dv = (numeros, pesos) => {
+    const soma = numeros.reduce((acc, n, i) => acc + n * pesos[i], 0);
+    const resto = soma % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+  const numeros = raiz.split("").map(Number);
+  const d1 = dv(numeros, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const d2 = dv([...numeros, d1], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return `${raiz}${d1}${d2}`;
+}
+
+// Identificadores exclusivos desta execução: o fluxo pode rodar quantas vezes
+// for necessário contra a mesma base, sem colidir com registros anteriores.
+const MARCA = Date.now().toString().slice(-8);
+const CNPJ_NOVO = gerarCnpj(Number(MARCA));
+const RAZAO_NOVA = `Empresa Cadastrada na Tela ${MARCA} Ltda`;
+
 async function etapa(nome, fn) {
   try {
     await fn();
@@ -206,6 +226,79 @@ await etapa("importa a planilha de teste pela interface", async () => {
   confirmar(texto.includes("Com erro: 1"), "linha com CNPJ inválido não sinalizada");
   confirmar(texto.includes("Duplicadas: 1"), "linha duplicada não sinalizada");
   await capturar("15-importacao-validacao");
+});
+
+await etapa("cadastra cliente novo pela interface", async () => {
+  await pagina.locator(".nav-item").filter({ hasText: "Clientes" }).first().click();
+  await pagina.waitForSelector("tbody tr");
+  await pagina.getByRole("button", { name: "Novo cliente" }).click();
+  await pagina.waitForSelector(".modal");
+  await pagina.fill("#campo-cnpj", CNPJ_NOVO);
+  await pagina.fill("#campo-raz-o-social", RAZAO_NOVA);
+  await pagina.fill("#campo-respons-vel", "Ana Souza");
+  await pagina.getByRole("button", { name: "Cadastrar" }).click();
+  await pagina.waitForSelector(".aviso.ok", { timeout: 15000 });
+  const texto = await pagina.textContent("main");
+  confirmar(texto.includes(RAZAO_NOVA), "cliente novo não apareceu na lista");
+  await capturar("16-cliente-cadastrado");
+});
+
+await etapa("cliente com CNPJ inválido é recusado na tela", async () => {
+  await pagina.getByRole("button", { name: "Novo cliente" }).click();
+  await pagina.waitForSelector(".modal");
+  await pagina.fill("#campo-cnpj", "11.111.111/1111-11");
+  await pagina.fill("#campo-raz-o-social", "Empresa Inválida Ltda");
+  await pagina.getByRole("button", { name: "Cadastrar" }).click();
+  await pagina.waitForSelector(".aviso.erro", { timeout: 15000 });
+  const erro = await pagina.textContent(".aviso.erro");
+  confirmar(erro.toLowerCase().includes("cnpj"), `mensagem inesperada: ${erro}`);
+  await pagina.locator(".modal header button").click();
+  // Esta etapa provoca um 422 de propósito: o navegador registra o erro de rede
+  // no console. Limpamos aqui para que a verificação final continue estrita.
+  errosConsole.length = 0;
+});
+
+await etapa("lança procuração manual e ela fica CINZA", async () => {
+  await pagina.fill("input[placeholder*='CNPJ, razão social']", RAZAO_NOVA);
+  await pagina.waitForTimeout(600);
+  await pagina.locator("tbody tr").first().click();
+  await pagina.waitForSelector("text=Procurações eletrônicas");
+  await pagina.getByRole("button", { name: "Nova procuração" }).click();
+  await pagina.waitForSelector(".modal");
+  await pagina.fill("#campo-n-mero-da-procura-o", `PROC-TELA-${MARCA}`);
+  await pagina.fill("#campo-validade", "2027-06-30");
+  await pagina.getByRole("button", { name: "Cadastrar" }).click();
+  await pagina.waitForSelector(".modal", { state: "detached", timeout: 15000 });
+  await pagina.waitForSelector(`text=PROC-TELA-${MARCA}`);
+  const linha = pagina.locator("tbody tr", { hasText: `PROC-TELA-${MARCA}` }).first();
+  const conteudo = await linha.textContent();
+  confirmar(conteudo.includes("Desconhecida"), `esperado situação desconhecida, obtido: ${conteudo}`);
+  confirmar(await linha.locator(".ponto.CINZA").count() > 0, "semáforo deveria ser CINZA");
+  await capturar("17-procuracao-manual");
+});
+
+await etapa("lança PER/DCOMP manual e ela fica SEM INFORMAÇÃO", async () => {
+  await pagina.getByRole("button", { name: "Nova PER/DCOMP" }).click();
+  await pagina.waitForSelector(".modal");
+  await pagina.fill("#campo-n-mero-da-per-dcomp", `41234.00000.${MARCA}.1.3.04-1`);
+  await pagina.fill("#campo-tributo", "PIS");
+  await pagina.fill("#campo-cr-dito-utilizado", "12500.00");
+  await pagina.getByRole("button", { name: "Cadastrar" }).click();
+  await pagina.waitForSelector(".modal", { state: "detached", timeout: 15000 });
+  const linha = pagina.locator("tbody tr", { hasText: `41234.00000.${MARCA}` }).first();
+  const conteudo = await linha.textContent();
+  confirmar(conteudo.includes("Sem informação atualizada"),
+    `esperado 'Sem informação atualizada', obtido: ${conteudo}`);
+  await capturar("18-perdcomp-manual");
+});
+
+await etapa("gestão de usuários disponível ao administrador", async () => {
+  await pagina.locator(".nav-item").filter({ hasText: "Usuários" }).first().click();
+  await pagina.waitForSelector("tbody tr");
+  const texto = await pagina.textContent("main");
+  confirmar(texto.includes("admin@monitortributario.com.br"), "lista de usuários não carregou");
+  confirmar(texto.includes("Redefinir senha"), "ação de redefinir senha ausente");
+  await capturar("19-usuarios");
 });
 
 await etapa("sem erros de console no fluxo", async () => {

@@ -99,3 +99,43 @@ export function Paginacao({ pagina, total, tamanho, aoMudar }: {
     </div>
   );
 }
+
+type OpcaoCampo = { valor: string; rotulo: string };
+
+export function Campo({ rotulo, valor, aoMudar, tipo = "text", obrigatorio, placeholder,
+                        opcoes, linhas, ajuda, desabilitado }: {
+  rotulo: string;
+  valor: string;
+  aoMudar: (v: string) => void;
+  tipo?: "text" | "email" | "date" | "number" | "password" | "select" | "textarea";
+  obrigatorio?: boolean;
+  placeholder?: string;
+  opcoes?: OpcaoCampo[];
+  linhas?: number;
+  ajuda?: string;
+  desabilitado?: boolean;
+}) {
+  const id = `campo-${rotulo.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return (
+    <div>
+      <label htmlFor={id}>{rotulo}{obrigatorio ? " *" : ""}</label>
+      {tipo === "select" ? (
+        <select id={id} value={valor} disabled={desabilitado}
+                onChange={(e) => aoMudar(e.target.value)}>
+          {(opcoes ?? []).map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+        </select>
+      ) : tipo === "textarea" ? (
+        <textarea id={id} value={valor} rows={linhas ?? 3} placeholder={placeholder}
+                  disabled={desabilitado} onChange={(e) => aoMudar(e.target.value)} />
+      ) : (
+        <input id={id} type={tipo} value={valor} placeholder={placeholder} disabled={desabilitado}
+               onChange={(e) => aoMudar(e.target.value)} />
+      )}
+      {ajuda && <div style={{ fontSize: 11, color: "var(--cinza-500)", marginTop: 4 }}>{ajuda}</div>}
+    </div>
+  );
+}
+
+export function Acoes({ children }: { children: ReactNode }) {
+  return <div className="espaco linha" style={{ justifyContent: "flex-end" }}>{children}</div>;
+}

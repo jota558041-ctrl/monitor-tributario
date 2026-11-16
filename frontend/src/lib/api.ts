@@ -6,7 +6,7 @@ export type Perfil = "ADMIN" | "ANALISTA" | "AUDITOR";
 
 export interface Usuario {
   id: string; nome: string; email: string; perfil: Perfil;
-  ativo: boolean; organizacao_id: string;
+  ativo: boolean; organizacao_id: string; ultimo_login?: string | null;
 }
 
 export interface Pagina<T> { itens: T[]; total: number; pagina: number; tamanho: number }

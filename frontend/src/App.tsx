@@ -14,6 +14,7 @@ import Monitoramento from "./paginas/Monitoramento";
 import Painel from "./paginas/Painel";
 import Procuracoes from "./paginas/Procuracoes";
 import SituacaoFiscal from "./paginas/SituacaoFiscal";
+import Usuarios from "./paginas/Usuarios";
 
 export default function App() {
   const [usuario, setUsuario] = useState<Usuario | null>(obterUsuario());
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/alertas" element={<Alertas />} />
         <Route path="/monitoramento" element={<Monitoramento perfil={usuario.perfil} />} />
         <Route path="/integracoes" element={<Integracoes />} />
+        {usuario.perfil === "ADMIN" && <Route path="/usuarios" element={<Usuarios />} />}
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<div className="vazio">Página não encontrada.</div>} />

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 
-from app.api.deps import DbSession, PodeEscrever, UsuarioAtual
+from app.api.deps import DbSession, PodeEscrever, SomenteAdmin, UsuarioAtual
 from app.connectors.base import ResultadoConsulta
 from app.connectors.registry import conector_compensacao
 from app.core.auditoria import registrar
@@ -22,6 +22,7 @@ from app.schemas.dominio import (
     CompensacaoIn,
     CompensacaoOut,
     CompensacaoResultadoManualIn,
+    CompensacaoUpdate,
 )
 from app.services import compensacoes as svc
 from app.services.cnpj import formatar_cnpj, limpar
@@ -142,6 +143,54 @@ def criar(dados: CompensacaoIn, usuario: PodeEscrever, db: DbSession) -> Compens
     db.commit()
     db.refresh(comp)
     return _saida(comp, cliente)
+
+
+@router.patch("/{compensacao_id}", response_model=CompensacaoOut)
+def alterar(
+    compensacao_id: str, dados: CompensacaoUpdate, usuario: PodeEscrever, db: DbSession
+) -> CompensacaoOut:
+    """Edita os dados declarados da PER/DCOMP.
+
+    A *situação da compensação* não muda por aqui: para isso existe a consulta à
+    fonte ou o registro de resultado oficial, que gravam origem e data.
+    """
+    comp = db.get(Compensacao, compensacao_id)
+    if comp is None or comp.organizacao_id != usuario.organizacao_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compensação não encontrada.")
+    alterados: dict[str, Any] = {}
+    for campo, valor in dados.model_dump(exclude_none=True).items():
+        atual = getattr(comp, campo)
+        if str(atual or "") != str(valor or ""):
+            alterados[campo] = {"de": str(atual) if atual is not None else None, "para": str(valor)}
+            setattr(comp, campo, valor)
+    if alterados:
+        db.add(CompensacaoEvento(
+            compensacao_id=comp.id, tipo="EDICAO_MANUAL",
+            situacao_anterior=comp.situacao_compensacao, situacao_nova=comp.situacao_compensacao,
+            origem=OrigemInformacao.MANUAL, disponibilidade=comp.disponibilidade,
+            mensagem=f"Dados declarados editados por {usuario.email}.",
+            payload=para_json({"campos": alterados}), registrado_em=utcnow(),
+            criado_por=usuario.email,
+        ))
+    registrar(db, acao="ALTERACAO", organizacao_id=usuario.organizacao_id, usuario_id=usuario.id,
+              usuario_email=usuario.email, entidade="COMPENSACAO", entidade_id=comp.id,
+              detalhe={"campos": alterados})
+    db.commit()
+    db.refresh(comp)
+    return _saida(comp, db.get(Cliente, comp.cliente_id))
+
+
+@router.delete("/{compensacao_id}", status_code=204)
+def excluir(compensacao_id: str, admin: SomenteAdmin, db: DbSession) -> None:
+    """Exclui a PER/DCOMP e seu histórico (restrito a ADMIN)."""
+    comp = db.get(Compensacao, compensacao_id)
+    if comp is None or comp.organizacao_id != admin.organizacao_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compensação não encontrada.")
+    registrar(db, acao="EXCLUSAO", organizacao_id=admin.organizacao_id, usuario_id=admin.id,
+              usuario_email=admin.email, entidade="COMPENSACAO", entidade_id=comp.id,
+              detalhe={"numero_perdcomp": comp.numero_perdcomp, "cliente_id": comp.cliente_id})
+    db.delete(comp)
+    db.commit()
 
 
 @router.post("/{compensacao_id}/consultar")

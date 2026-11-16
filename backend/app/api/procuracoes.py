@@ -7,14 +7,19 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import or_, select
 
-from app.api.deps import DbSession, PodeEscrever, UsuarioAtual
+from app.api.deps import DbSession, PodeEscrever, SomenteAdmin, UsuarioAtual
 from app.connectors.registry import conector_procuracao
 from app.core.auditoria import registrar
 from app.models.cliente import Cliente
-from app.models.enums import Semaforo
+from app.models.enums import Semaforo, SituacaoProcuracao
 from app.models.procuracao import Procuracao, ProcuracaoConsulta
 from app.schemas.comum import Pagina
-from app.schemas.dominio import ProcuracaoConsultaOut, ProcuracaoIn, ProcuracaoOut
+from app.schemas.dominio import (
+    ProcuracaoConsultaOut,
+    ProcuracaoIn,
+    ProcuracaoOut,
+    ProcuracaoUpdate,
+)
 from app.services import procuracoes as svc
 from app.services.cnpj import formatar_cnpj, limpar
 
@@ -139,6 +144,48 @@ def criar(dados: ProcuracaoIn, usuario: PodeEscrever, db: DbSession) -> Procurac
     db.commit()
     db.refresh(proc)
     return _saida(proc, cliente)
+
+
+@router.patch("/{procuracao_id}", response_model=ProcuracaoOut)
+def alterar(
+    procuracao_id: str, dados: ProcuracaoUpdate, usuario: PodeEscrever, db: DbSession
+) -> ProcuracaoOut:
+    """Edita os dados cadastrais da procuração.
+
+    Editar à mão NÃO torna a procuração validada: `validada_por_fonte` continua
+    como está e a situação do sistema é recalculada apenas como *declarada*.
+    """
+    proc = db.get(Procuracao, procuracao_id)
+    if proc is None or proc.organizacao_id != usuario.organizacao_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Procuração não encontrada.")
+    alterados: dict[str, Any] = {}
+    for campo, valor in dados.model_dump(exclude_none=True).items():
+        atual = getattr(proc, campo)
+        if str(atual or "") != str(valor or ""):
+            alterados[campo] = {"de": str(atual) if atual is not None else None, "para": str(valor)}
+            setattr(proc, campo, valor)
+    proc.situacao_declarada = svc.situacao_por_data(proc.data_fim)
+    if not proc.validada_por_fonte:
+        proc.situacao = SituacaoProcuracao.DESCONHECIDA
+    registrar(db, acao="ALTERACAO", organizacao_id=usuario.organizacao_id, usuario_id=usuario.id,
+              usuario_email=usuario.email, entidade="PROCURACAO", entidade_id=proc.id,
+              detalhe={"campos": alterados})
+    db.commit()
+    db.refresh(proc)
+    return _saida(proc, db.get(Cliente, proc.cliente_id))
+
+
+@router.delete("/{procuracao_id}", status_code=204)
+def excluir(procuracao_id: str, admin: SomenteAdmin, db: DbSession) -> None:
+    """Exclui a procuração e seu histórico de consultas (restrito a ADMIN)."""
+    proc = db.get(Procuracao, procuracao_id)
+    if proc is None or proc.organizacao_id != admin.organizacao_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Procuração não encontrada.")
+    registrar(db, acao="EXCLUSAO", organizacao_id=admin.organizacao_id, usuario_id=admin.id,
+              usuario_email=admin.email, entidade="PROCURACAO", entidade_id=proc.id,
+              detalhe={"numero": proc.numero, "cliente_id": proc.cliente_id})
+    db.delete(proc)
+    db.commit()
 
 
 @router.post("/{procuracao_id}/consultar", response_model=dict)

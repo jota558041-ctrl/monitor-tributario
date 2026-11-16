@@ -87,6 +87,18 @@ class ProcuracaoIn(BaseModel):
     observacoes: str | None = None
 
 
+class ProcuracaoUpdate(BaseModel):
+    """Edição cadastral. Não altera `validada_por_fonte` nem a situação oficial."""
+    numero: str | None = None
+    procurador_doc: str | None = None
+    procurador_nome: str | None = None
+    data_inicio: date | None = None
+    data_fim: date | None = None
+    poderes: list[str] | None = None
+    servicos_autorizados: list[str] | None = None
+    observacoes: str | None = None
+
+
 class ProcuracaoOut(Base):
     id: str
     cliente_id: str
@@ -134,6 +146,23 @@ class CompensacaoIn(BaseModel):
     valor_credito: Decimal | None = None
     situacao_compensacao: SituacaoCompensacao | None = None
     situacao_declaracao: str | None = None
+    observacoes: str | None = None
+
+
+class CompensacaoUpdate(BaseModel):
+    """Edição dos dados declarados da PER/DCOMP.
+
+    A situação da compensação NÃO é editável por aqui: ela só muda por consulta
+    à fonte ou pelo registro de resultado oficial (que grava proveniência).
+    """
+    tipo_documento: str | None = None
+    data_transmissao: date | None = None
+    tributo: str | None = None
+    periodo_apuracao: str | None = None
+    valor_debito: Decimal | None = None
+    valor_credito: Decimal | None = None
+    situacao_declaracao: str | None = None
+    processo_administrativo: str | None = None
     observacoes: str | None = None
 
 

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  Aviso, Cartao, Carregando, Definicoes, Modal, PontoSemaforo, Selo, Vazio,
+  Acoes, Aviso, Campo, Cartao, Carregando, Definicoes, Modal, PontoSemaforo, Selo, Vazio,
 } from "../componentes/ui";
 import {
-  Alerta, Cliente, Comparativo, Compensacao, Pagina, Procuracao, Snapshot, api,
+  Alerta, Cliente, Comparativo, Compensacao, Pagina, Procuracao, Snapshot, api, obterUsuario,
 } from "../lib/api";
 import {
   COR_CRITICIDADE, COR_DISPONIBILIDADE, COR_SITUACAO_COMPENSACAO, COR_SITUACAO_FISCAL,
@@ -32,6 +32,78 @@ export default function ClienteDetalhe() {
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verPendencias, setVerPendencias] = useState<Snapshot | null>(null);
+  const [editandoCliente, setEditandoCliente] = useState<Record<string, string> | null>(null);
+  const [formProc, setFormProc] = useState<Record<string, string> | null>(null);
+  const [formComp, setFormComp] = useState<Record<string, string> | null>(null);
+  const perfil = obterUsuario()?.perfil;
+
+  function abrirEdicaoCliente() {
+    if (!cliente) return;
+    setEditandoCliente({
+      razao_social: cliente.razao_social ?? "", nome_fantasia: cliente.nome_fantasia ?? "",
+      email: cliente.email ?? "", responsavel: cliente.responsavel ?? "",
+      telefone: cliente.telefone ?? "", tributos_trabalhados: cliente.tributos_trabalhados ?? "",
+      observacoes: cliente.observacoes ?? "",
+    });
+  }
+
+  async function salvarCliente() {
+    if (!editandoCliente) return;
+    setOcupado(true);
+    try {
+      await api.patch(`/clientes/${id}`, editandoCliente);
+      setEditandoCliente(null);
+      await carregar();
+    } catch (e) { setErro(e instanceof Error ? e.message : "Falha ao salvar."); }
+    finally { setOcupado(false); }
+  }
+
+  async function salvarProcuracao() {
+    if (!formProc) return;
+    setOcupado(true);
+    try {
+      const corpo: Record<string, unknown> = Object.fromEntries(
+        Object.entries(formProc).filter(([k, v]) => k !== "id" && String(v).trim() !== ""),
+      );
+      if (formProc.id) {
+        await api.patch(`/procuracoes/${formProc.id}`, corpo);
+      } else {
+        await api.post("/procuracoes", { ...corpo, cliente_id: id });
+      }
+      setFormProc(null);
+      await carregar();
+    } catch (e) { setErro(e instanceof Error ? e.message : "Falha ao salvar procuração."); }
+    finally { setOcupado(false); }
+  }
+
+  async function salvarCompensacao() {
+    if (!formComp) return;
+    setOcupado(true);
+    try {
+      const corpo: Record<string, unknown> = Object.fromEntries(
+        Object.entries(formComp).filter(([k, v]) => k !== "id" && String(v).trim() !== ""),
+      );
+      if (formComp.id) {
+        delete corpo.numero_perdcomp;
+        await api.patch(`/compensacoes/${formComp.id}`, corpo);
+      } else {
+        await api.post("/compensacoes", { ...corpo, cliente_id: id });
+      }
+      setFormComp(null);
+      await carregar();
+    } catch (e) { setErro(e instanceof Error ? e.message : "Falha ao salvar PER/DCOMP."); }
+    finally { setOcupado(false); }
+  }
+
+  async function excluir(tipo: "procuracoes" | "compensacoes", registroId: string, rotulo: string) {
+    if (!window.confirm(`Excluir ${rotulo}? O histórico vinculado também será removido.`)) return;
+    setOcupado(true);
+    try {
+      await api.delete(`/${tipo}/${registroId}`);
+      await carregar();
+    } catch (e) { setErro(e instanceof Error ? e.message : "Falha ao excluir."); }
+    finally { setOcupado(false); }
+  }
 
   async function carregar() {
     try {
@@ -80,9 +152,14 @@ export default function ClienteDetalhe() {
       <Cartao
         titulo={cliente.razao_social}
         descricao={`${cliente.cnpj_formatado ?? fmtCnpj(cliente.cnpj)} · ${cliente.nome_fantasia ?? "sem nome fantasia"}`}
-        acoes={<button className="primario pequeno" onClick={consultarTudo} disabled={ocupado}>
-          {ocupado ? <span className="carregando" /> : null} Consultar agora
-        </button>}
+        acoes={
+          <>
+            <button className="pequeno" onClick={abrirEdicaoCliente}>Editar cliente</button>
+            <button className="primario pequeno" onClick={consultarTudo} disabled={ocupado}>
+              {ocupado ? <span className="carregando" /> : null} Consultar agora
+            </button>
+          </>
+        }
       >
         <Definicoes itens={[
           ["Responsável", cliente.responsavel ?? "—"],
@@ -109,12 +186,16 @@ export default function ClienteDetalhe() {
         </Cartao>
       )}
 
-      <Cartao titulo="Procurações eletrônicas" semPadding>
+      <Cartao titulo="Procurações eletrônicas" semPadding
+              acoes={<button className="pequeno" onClick={() => setFormProc({
+                numero: "", procurador_doc: "", data_inicio: "", data_fim: "", observacoes: "",
+              })}>Nova procuração</button>}>
         {procuracoes.length === 0 ? <Vazio>Nenhuma procuração cadastrada.</Vazio> : (
           <table>
             <thead>
               <tr><th>Número</th><th>Validade</th><th>Situação (sistema)</th><th>Declarada</th>
-                  <th>Validada por fonte</th><th>Disponibilidade</th><th>Última consulta</th></tr>
+                  <th>Validada por fonte</th><th>Disponibilidade</th><th>Última consulta</th>
+                  <th /></tr>
             </thead>
             <tbody>
               {procuracoes.map((p) => (
@@ -127,6 +208,20 @@ export default function ClienteDetalhe() {
                   <td>{p.validada_por_fonte ? <Selo cor="verde">Sim</Selo> : <Selo cor="cinza">Não</Selo>}</td>
                   <td><Selo cor={COR_DISPONIBILIDADE[p.disponibilidade]}>{rotulo(p.disponibilidade)}</Selo></td>
                   <td style={{ fontSize: 12 }}>{dataHora(p.consultado_em)}</td>
+                  <td>
+                    <div className="linha" style={{ gap: 4 }}>
+                      <button className="link pequeno" onClick={() => setFormProc({
+                        id: p.id, numero: p.numero ?? "", procurador_doc: p.procurador_doc ?? "",
+                        data_inicio: p.data_inicio ?? "", data_fim: p.data_fim ?? "",
+                        observacoes: p.observacoes ?? "",
+                      })}>Editar</button>
+                      {perfil === "ADMIN" && (
+                        <button className="link pequeno" style={{ color: "var(--vermelho)" }}
+                                onClick={() => excluir("procuracoes", p.id,
+                                  `a procuração ${p.numero ?? ""}`)}>Excluir</button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -134,13 +229,17 @@ export default function ClienteDetalhe() {
         )}
       </Cartao>
 
-      <Cartao titulo="Compensações (PER/DCOMP)" semPadding>
+      <Cartao titulo="Compensações (PER/DCOMP)" semPadding
+              acoes={<button className="pequeno" onClick={() => setFormComp({
+                numero_perdcomp: "", tributo: "", periodo_apuracao: "", data_transmissao: "",
+                valor_debito: "", valor_credito: "", situacao_declaracao: "", observacoes: "",
+              })}>Nova PER/DCOMP</button>}>
         {compensacoes.length === 0 ? <Vazio>Nenhuma PER/DCOMP cadastrada.</Vazio> : (
           <table>
             <thead>
               <tr><th>Número</th><th>Tributo</th><th>PA</th><th className="num">Crédito</th>
                   <th className="num">Não homologado</th><th>Situação</th><th>Despacho</th>
-                  <th>Intimação</th><th>Consulta</th></tr>
+                  <th>Intimação</th><th>Consulta</th><th /></tr>
             </thead>
             <tbody>
               {compensacoes.map((c) => (
@@ -157,6 +256,23 @@ export default function ClienteDetalhe() {
                   <td style={{ fontSize: 12 }}>
                     <Selo cor={COR_DISPONIBILIDADE[c.disponibilidade]}>{rotulo(c.disponibilidade)}</Selo>
                     <div style={{ color: "var(--cinza-500)" }}>{dataHora(c.consultado_em)}</div>
+                  </td>
+                  <td>
+                    <div className="linha" style={{ gap: 4 }}>
+                      <button className="link pequeno" onClick={() => setFormComp({
+                        id: c.id, numero_perdcomp: c.numero_perdcomp, tributo: c.tributo ?? "",
+                        periodo_apuracao: c.periodo_apuracao ?? "",
+                        data_transmissao: c.data_transmissao ?? "",
+                        valor_debito: c.valor_debito ?? "", valor_credito: c.valor_credito ?? "",
+                        situacao_declaracao: c.situacao_declaracao ?? "",
+                        observacoes: c.observacoes ?? "",
+                      })}>Editar</button>
+                      {perfil === "ADMIN" && (
+                        <button className="link pequeno" style={{ color: "var(--vermelho)" }}
+                                onClick={() => excluir("compensacoes", c.id,
+                                  `a PER/DCOMP ${c.numero_perdcomp}`)}>Excluir</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -302,6 +418,108 @@ export default function ClienteDetalhe() {
                 </tbody>
               </table>
             )}
+          </div>
+        </Modal>
+      )}
+      {editandoCliente && (
+        <Modal titulo="Editar cliente" aoFechar={() => setEditandoCliente(null)} largura={620}>
+          <div className="grade">
+            <Aviso tipo="info">
+              O CNPJ não é editável: para corrigi-lo, cadastre o cliente correto. Toda alteração
+              fica registrada no histórico, campo a campo.
+            </Aviso>
+            <div className="grade g2">
+              <Campo rotulo="Razão social" valor={editandoCliente.razao_social} obrigatorio
+                     aoMudar={(v) => setEditandoCliente({ ...editandoCliente, razao_social: v })} />
+              <Campo rotulo="Nome fantasia" valor={editandoCliente.nome_fantasia}
+                     aoMudar={(v) => setEditandoCliente({ ...editandoCliente, nome_fantasia: v })} />
+              <Campo rotulo="E-mail" tipo="email" valor={editandoCliente.email}
+                     aoMudar={(v) => setEditandoCliente({ ...editandoCliente, email: v })} />
+              <Campo rotulo="Responsável" valor={editandoCliente.responsavel}
+                     aoMudar={(v) => setEditandoCliente({ ...editandoCliente, responsavel: v })} />
+              <Campo rotulo="Telefone" valor={editandoCliente.telefone}
+                     aoMudar={(v) => setEditandoCliente({ ...editandoCliente, telefone: v })} />
+              <Campo rotulo="Tributos trabalhados" valor={editandoCliente.tributos_trabalhados}
+                     aoMudar={(v) => setEditandoCliente({
+                       ...editandoCliente, tributos_trabalhados: v })} />
+            </div>
+            <Campo rotulo="Observações" tipo="textarea" valor={editandoCliente.observacoes}
+                   aoMudar={(v) => setEditandoCliente({ ...editandoCliente, observacoes: v })} />
+            <Acoes>
+              <button onClick={() => setEditandoCliente(null)}>Cancelar</button>
+              <button className="primario" onClick={salvarCliente} disabled={ocupado}>Salvar</button>
+            </Acoes>
+          </div>
+        </Modal>
+      )}
+
+      {formProc && (
+        <Modal titulo={formProc.id ? "Editar procuração" : "Nova procuração"}
+               aoFechar={() => setFormProc(null)} largura={620}>
+          <div className="grade">
+            <Aviso tipo="atencao">
+              Lançar uma procuração à mão <b>não</b> a torna validada: o semáforo permanece
+              <b> CINZA</b> até uma consulta bem-sucedida à fonte autorizada.
+            </Aviso>
+            <div className="grade g2">
+              <Campo rotulo="Número da procuração" valor={formProc.numero}
+                     aoMudar={(v) => setFormProc({ ...formProc, numero: v })} />
+              <Campo rotulo="CPF/CNPJ do procurador" valor={formProc.procurador_doc}
+                     aoMudar={(v) => setFormProc({ ...formProc, procurador_doc: v })} />
+              <Campo rotulo="Início da vigência" tipo="date" valor={formProc.data_inicio}
+                     aoMudar={(v) => setFormProc({ ...formProc, data_inicio: v })} />
+              <Campo rotulo="Validade" tipo="date" valor={formProc.data_fim}
+                     ajuda="Base para os alertas de 30, 15, 7 e 0 dias."
+                     aoMudar={(v) => setFormProc({ ...formProc, data_fim: v })} />
+            </div>
+            <Campo rotulo="Observações" tipo="textarea" valor={formProc.observacoes}
+                   aoMudar={(v) => setFormProc({ ...formProc, observacoes: v })} />
+            <Acoes>
+              <button onClick={() => setFormProc(null)}>Cancelar</button>
+              <button className="primario" onClick={salvarProcuracao} disabled={ocupado}>
+                {formProc.id ? "Salvar" : "Cadastrar"}
+              </button>
+            </Acoes>
+          </div>
+        </Modal>
+      )}
+
+      {formComp && (
+        <Modal titulo={formComp.id ? "Editar PER/DCOMP" : "Nova PER/DCOMP"}
+               aoFechar={() => setFormComp(null)} largura={680}>
+          <div className="grade">
+            <Aviso tipo="atencao">
+              Aqui entram apenas os <b>dados declarados</b>. A situação da compensação muda somente
+              por consulta à fonte ou pelo registro de resultado oficial, que gravam origem e data.
+            </Aviso>
+            <div className="grade g2">
+              <Campo rotulo="Número da PER/DCOMP" valor={formComp.numero_perdcomp} obrigatorio
+                     desabilitado={Boolean(formComp.id)}
+                     aoMudar={(v) => setFormComp({ ...formComp, numero_perdcomp: v })} />
+              <Campo rotulo="Tributo" valor={formComp.tributo}
+                     aoMudar={(v) => setFormComp({ ...formComp, tributo: v })} />
+              <Campo rotulo="Período de apuração" valor={formComp.periodo_apuracao}
+                     placeholder="MM/AAAA"
+                     aoMudar={(v) => setFormComp({ ...formComp, periodo_apuracao: v })} />
+              <Campo rotulo="Data de transmissão" tipo="date" valor={formComp.data_transmissao}
+                     aoMudar={(v) => setFormComp({ ...formComp, data_transmissao: v })} />
+              <Campo rotulo="Valor do débito" valor={formComp.valor_debito} placeholder="0.00"
+                     aoMudar={(v) => setFormComp({ ...formComp, valor_debito: v })} />
+              <Campo rotulo="Crédito utilizado" valor={formComp.valor_credito} placeholder="0.00"
+                     aoMudar={(v) => setFormComp({ ...formComp, valor_credito: v })} />
+              <Campo rotulo="Situação da declaração" valor={formComp.situacao_declaracao}
+                     placeholder="ATIVA, RETIFICADA…"
+                     aoMudar={(v) => setFormComp({ ...formComp, situacao_declaracao: v })} />
+            </div>
+            <Campo rotulo="Observações" tipo="textarea" valor={formComp.observacoes}
+                   aoMudar={(v) => setFormComp({ ...formComp, observacoes: v })} />
+            <Acoes>
+              <button onClick={() => setFormComp(null)}>Cancelar</button>
+              <button className="primario" onClick={salvarCompensacao}
+                      disabled={ocupado || !formComp.numero_perdcomp}>
+                {formComp.id ? "Salvar" : "Cadastrar"}
+              </button>
+            </Acoes>
           </div>
         </Modal>
       )}

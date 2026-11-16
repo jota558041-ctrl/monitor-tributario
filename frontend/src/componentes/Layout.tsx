@@ -2,7 +2,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Usuario, api, limparSessao } from "../lib/api";
 
-const MENU: { grupo: string; itens: { rota: string; nome: string; icone: string }[] }[] = [
+const MENU: { grupo: string; itens: { rota: string; nome: string; icone: string;
+  somenteAdmin?: boolean }[] }[] = [
   {
     grupo: "Visão geral",
     itens: [
@@ -31,6 +32,7 @@ const MENU: { grupo: string; itens: { rota: string; nome: string; icone: string 
     itens: [
       { rota: "/integracoes", nome: "Fontes de dados", icone: "⛓" },
       { rota: "/auditoria", nome: "Auditoria", icone: "✓" },
+      { rota: "/usuarios", nome: "Usuários", icone: "⚇", somenteAdmin: true },
     ],
   },
 ];
@@ -46,6 +48,7 @@ const TITULOS: Record<string, { titulo: string; sub: string }> = {
   "/monitoramento": { titulo: "Monitoramento", sub: "Execuções, agendamentos e simulador de mudanças" },
   "/integracoes": { titulo: "Fontes de dados", sub: "Capacidades, limitações e requisitos de cada fonte" },
   "/auditoria": { titulo: "Trilha de auditoria", sub: "Quem acessou ou alterou cada informação" },
+  "/usuarios": { titulo: "Usuários", sub: "Perfis de acesso, ativação e redefinição de senha" },
 };
 
 export default function Layout({ usuario, children }: { usuario: Usuario; children: ReactNode }) {
@@ -76,7 +79,8 @@ export default function Layout({ usuario, children }: { usuario: Usuario; childr
         {MENU.map((grupo) => (
           <div key={grupo.grupo}>
             <div className="nav-grupo">{grupo.grupo}</div>
-            {grupo.itens.map((item) => (
+            {grupo.itens.filter((item) => !item.somenteAdmin || usuario.perfil === "ADMIN")
+              .map((item) => (
               <button
                 key={item.rota}
                 className={`nav-item${(item.rota === "/" ? local.pathname === "/" : local.pathname.startsWith(item.rota)) ? " ativo" : ""}`}
