@@ -22,3 +22,5 @@ e2e/capturas/
 .pytest_cache/
 .ruff_cache/
 frontend/tsconfig.tsbuildinfo
+arquivos/
+arquivos/

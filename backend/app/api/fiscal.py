@@ -95,7 +95,10 @@ def consultar_agora(cliente_id: str, usuario: PodeEscrever, db: DbSession) -> di
     snapshot = svc.criar_snapshot(db, cliente, resultado, usuario_email=usuario.email)
     comparativo = None
     if anterior is not None and snapshot.disponibilidade == Disponibilidade.OK:
-        comparativo = svc.comparar(db, cliente, anterior, snapshot)
+        # Persiste apenas quando houve mudança; sem mudança, devolve a comparação
+        # calculada na hora (informativa) sem poluir o histórico.
+        mudou = anterior.hash_conteudo != snapshot.hash_conteudo
+        comparativo = svc.comparar(db, cliente, anterior, snapshot, persistir=mudou)
     registrar(db, acao="CONSULTA_FONTE", organizacao_id=usuario.organizacao_id,
               usuario_id=usuario.id, usuario_email=usuario.email, entidade="SITUACAO_FISCAL",
               entidade_id=snapshot.id, detalhe={"disponibilidade": snapshot.disponibilidade})

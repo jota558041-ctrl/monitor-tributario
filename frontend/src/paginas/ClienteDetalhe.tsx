@@ -4,8 +4,8 @@ import {
   Acoes, Aviso, Campo, Cartao, Carregando, Definicoes, Modal, PontoSemaforo, Selo, Vazio,
 } from "../componentes/ui";
 import {
-  Alerta, Cliente, Comparativo, Compensacao, Pagina, Procuracao, Snapshot, api, baixarArquivo,
-  obterUsuario,
+  Alerta, Cliente, Comparativo, Compensacao, Documento, Pagina, Procuracao, Snapshot, api,
+  baixarArquivo, obterUsuario,
 } from "../lib/api";
 import {
   COR_CRITICIDADE, COR_DISPONIBILIDADE, COR_SITUACAO_COMPENSACAO, COR_SITUACAO_FISCAL,
@@ -30,6 +30,15 @@ export default function ClienteDetalhe() {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [historico, setHistorico] = useState<Historico[]>([]);
   const [ia, setIa] = useState<ResumoIa | null>(null);
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
+  const [categorias, setCategorias] = useState<{ codigo: string; rotulo: string }[]>([]);
+  const [limites, setLimites] = useState<{ tamanho_maximo_mb: number;
+    extensoes_aceitas: string[] } | null>(null);
+  const [anexo, setAnexo] = useState<{ categoria: string; descricao: string;
+    entidade_id: string; restrito: boolean }>(
+    { categoria: "DESPACHO_DECISORIO", descricao: "", entidade_id: "", restrito: false });
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verPendencias, setVerPendencias] = useState<Snapshot | null>(null);
@@ -108,7 +117,7 @@ export default function ClienteDetalhe() {
 
   async function carregar() {
     try {
-      const [c, pr, co, sn, cp, al, hi, resumoIa] = await Promise.all([
+      const [c, pr, co, sn, cp, al, hi, resumoIa, docs] = await Promise.all([
         api.get<Cliente>(`/clientes/${id}`),
         api.get<Pagina<Procuracao>>("/procuracoes", { busca: "", tamanho: 100 }),
         api.get<Pagina<Compensacao>>("/compensacoes", { cliente_id: id, tamanho: 100 }),
@@ -117,6 +126,7 @@ export default function ClienteDetalhe() {
         api.get<Pagina<Alerta>>("/alertas", { cliente_id: id, tamanho: 50 }),
         api.get<Historico[]>(`/clientes/${id}/historico`),
         api.get<ResumoIa>(`/ia/resumo/${id}`),
+        api.get<Documento[]>("/documentos", { cliente_id: id }),
       ]);
       setCliente(c);
       setProcuracoes(pr.itens.filter((p) => p.cliente_id === id));
@@ -126,12 +136,55 @@ export default function ClienteDetalhe() {
       setAlertas(al.itens);
       setHistorico(hi);
       setIa(resumoIa);
+      setDocumentos(docs);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar cliente.");
     }
   }
 
   useEffect(() => { carregar(); }, [id]);
+  useEffect(() => {
+    api.get<{ codigo: string; rotulo: string }[]>("/documentos/categorias")
+      .then(setCategorias).catch(() => {});
+    api.get<{ tamanho_maximo_mb: number; extensoes_aceitas: string[] }>("/documentos/limites")
+      .then(setLimites).catch(() => {});
+  }, []);
+
+  async function enviarDocumento() {
+    if (!arquivo) return;
+    setOcupado(true);
+    setErro(null);
+    setMensagem(null);
+    try {
+      const corpo = new FormData();
+      corpo.append("arquivo", arquivo);
+      corpo.append("cliente_id", id);
+      corpo.append("categoria", anexo.categoria);
+      corpo.append("restrito", String(anexo.restrito));
+      if (anexo.descricao) corpo.append("descricao", anexo.descricao);
+      if (anexo.entidade_id) {
+        corpo.append("entidade", "COMPENSACAO");
+        corpo.append("entidade_id", anexo.entidade_id);
+      }
+      const enviado = await api.upload<Documento>("/documentos", corpo);
+      setMensagem(enviado.aviso
+        ? `Documento anexado. ${enviado.aviso}`
+        : `Documento "${enviado.nome_original}" anexado.`);
+      setArquivo(null);
+      setAnexo({ ...anexo, descricao: "", entidade_id: "" });
+      setDocumentos(await api.get<Documento[]>("/documentos", { cliente_id: id }));
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao anexar documento.");
+    } finally { setOcupado(false); }
+  }
+
+  async function excluirDocumento(documento: Documento) {
+    if (!window.confirm(`Excluir "${documento.nome_original}"? O arquivo será apagado.`)) return;
+    try {
+      await api.delete(`/documentos/${documento.id}`);
+      setDocumentos(await api.get<Documento[]>("/documentos", { cliente_id: id }));
+    } catch (e) { setErro(e instanceof Error ? e.message : "Falha ao excluir documento."); }
+  }
 
   async function consultarTudo() {
     setOcupado(true);
@@ -143,13 +196,20 @@ export default function ClienteDetalhe() {
     } finally { setOcupado(false); }
   }
 
-  if (erro) return <Aviso tipo="erro">{erro}</Aviso>;
-  if (!cliente) return <Carregando />;
+  if (!cliente) return erro ? <Aviso tipo="erro">{erro}</Aviso> : <Carregando />;
 
   const ultimo = snapshots[0];
 
+  function tamanho(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  }
+
   return (
     <div className="grade">
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      {mensagem && <Aviso tipo="ok">{mensagem}</Aviso>}
       <Cartao
         titulo={cliente.razao_social}
         descricao={`${cliente.cnpj_formatado ?? fmtCnpj(cliente.cnpj)} · ${cliente.nome_fantasia ?? "sem nome fantasia"}`}
@@ -351,6 +411,93 @@ export default function ClienteDetalhe() {
           )}
         </Cartao>
       </div>
+
+      <Cartao titulo="Documentos anexados" semPadding
+              descricao="Despachos, intimações e relatórios do e-CAC — todo download é registrado na auditoria">
+        <div style={{ padding: 16, borderBottom: "1px solid var(--cinza-100)" }}>
+          <div className="grade g4" style={{ alignItems: "end" }}>
+            <div>
+              <label htmlFor="arquivo-anexo">Arquivo</label>
+              <input id="arquivo-anexo" type="file"
+                     onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
+            </div>
+            <Campo rotulo="Categoria" tipo="select" valor={anexo.categoria}
+                   opcoes={categorias.map((c) => ({ valor: c.codigo, rotulo: c.rotulo }))}
+                   aoMudar={(v) => setAnexo({ ...anexo, categoria: v })} />
+            <Campo rotulo="Vincular a uma PER/DCOMP" tipo="select" valor={anexo.entidade_id}
+                   opcoes={[{ valor: "", rotulo: "— nenhuma —" },
+                            ...compensacoes.map((c) => ({ valor: c.id,
+                              rotulo: c.numero_perdcomp }))]}
+                   aoMudar={(v) => setAnexo({ ...anexo, entidade_id: v })} />
+            <Campo rotulo="Descrição" valor={anexo.descricao}
+                   aoMudar={(v) => setAnexo({ ...anexo, descricao: v })} />
+          </div>
+          <div className="linha espaco" style={{ justifyContent: "space-between" }}>
+            <label style={{ margin: 0, fontWeight: 500 }}>
+              <input type="checkbox" style={{ width: "auto", marginRight: 6 }}
+                     checked={anexo.restrito}
+                     onChange={(e) => setAnexo({ ...anexo, restrito: e.target.checked })} />
+              Restrito — somente administradores podem baixar
+            </label>
+            <div className="linha">
+              {limites && (
+                <span style={{ fontSize: 11, color: "var(--cinza-500)" }}>
+                  até {limites.tamanho_maximo_mb} MB · {limites.extensoes_aceitas.join(" ")}
+                </span>
+              )}
+              <button className="primario pequeno" onClick={enviarDocumento}
+                      disabled={!arquivo || ocupado}>Anexar</button>
+            </div>
+          </div>
+        </div>
+
+        {documentos.length === 0 ? <Vazio>Nenhum documento anexado.</Vazio> : (
+          <table>
+            <thead><tr><th>Arquivo</th><th>Categoria</th><th>Vínculo</th><th>Descrição</th>
+                        <th className="num">Tamanho</th><th>Enviado por</th><th>Quando</th>
+                        <th /></tr></thead>
+            <tbody>
+              {documentos.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    <b style={{ color: "var(--marinho)" }}>{d.nome_original}</b>
+                    {d.restrito && <> <Selo cor="vermelho">Restrito</Selo></>}
+                    <div className="mono" style={{ fontSize: 10, color: "var(--cinza-500)" }}
+                         title={`SHA-256: ${d.sha256}`}>sha256 {d.sha256.slice(0, 16)}…</div>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{rotulo(d.categoria)}</td>
+                  <td style={{ fontSize: 11 }}>
+                    {d.entidade === "COMPENSACAO"
+                      ? (compensacoes.find((c) => c.id === d.entidade_id)?.numero_perdcomp ?? "PER/DCOMP")
+                      : "Cliente"}
+                  </td>
+                  <td style={{ fontSize: 12 }}>{d.descricao ?? "—"}</td>
+                  <td className="num">{tamanho(d.tamanho_bytes)}</td>
+                  <td style={{ fontSize: 12 }}>{d.enviado_por ?? "—"}</td>
+                  <td style={{ fontSize: 12 }}>{dataHora(d.created_at)}</td>
+                  <td>
+                    <div className="linha" style={{ gap: 4 }}>
+                      <button className="link pequeno" disabled={d.pode_baixar === false}
+                              title={d.pode_baixar === false
+                                ? "Documento restrito: apenas administradores" : undefined}
+                              onClick={async () => {
+                                try { await baixarArquivo(`/documentos/${d.id}/download`); }
+                                catch (e) {
+                                  setErro(e instanceof Error ? e.message : "Falha no download.");
+                                }
+                              }}>Baixar</button>
+                      {perfil === "ADMIN" && (
+                        <button className="link pequeno" style={{ color: "var(--vermelho)" }}
+                                onClick={() => excluirDocumento(d)}>Excluir</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Cartao>
 
       <div className="grade g2">
         <Cartao titulo="Alertas do cliente" semPadding>

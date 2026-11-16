@@ -247,3 +247,43 @@ def test_deduplicacao_de_alertas(db, cliente, organizacao):
     r2 = svc_alertas.registrar_achados(db, organizacao.id, achados)
     assert r1["criados"] == 1
     assert r2["criados"] == 0 and r2["repetidos"] == 1
+
+
+def test_consulta_sem_mudanca_nao_gera_comparativo_redundante(db, cliente, organizacao):
+    """Repetir a consulta com o mesmo conteúdo não deve poluir o histórico."""
+    from sqlalchemy import select
+
+    from app.models.fiscal import SituacaoFiscalComparativo
+    from app.models.monitoramento import EstadoSimulado
+    from app.services import monitoramento as svc_monitor
+
+    db.add(EstadoSimulado(
+        organizacao_id=organizacao.id, cliente_id=cliente.id,
+        situacao_fiscal={"situacao_geral": "COM_PENDENCIAS",
+                         "pendencias": [_pendencia("ESTAVEL", "1000.00")]},
+        compensacoes={}, procuracoes={},
+    ))
+    db.flush()
+
+    for _ in range(3):
+        svc_monitor.executar(db, organizacao_id=organizacao.id,
+                             tipo="SITUACAO_FISCAL", acionada_por="TESTE")
+    comparativos = db.scalars(
+        select(SituacaoFiscalComparativo)
+        .where(SituacaoFiscalComparativo.cliente_id == cliente.id)
+    ).all()
+    assert comparativos == [], "consultas idênticas não devem gerar comparativo"
+
+    estado = db.scalar(select(EstadoSimulado).where(EstadoSimulado.cliente_id == cliente.id))
+    estado.situacao_fiscal = {"situacao_geral": "COM_PENDENCIAS",
+                              "pendencias": [_pendencia("ESTAVEL", "1000.00"),
+                                             _pendencia("NOVO", "500.00")]}
+    db.flush()
+    svc_monitor.executar(db, organizacao_id=organizacao.id,
+                         tipo="SITUACAO_FISCAL", acionada_por="TESTE")
+    comparativos = db.scalars(
+        select(SituacaoFiscalComparativo)
+        .where(SituacaoFiscalComparativo.cliente_id == cliente.id)
+    ).all()
+    assert len(comparativos) == 1
+    assert [p["codigo"] for p in comparativos[0].novos] == ["NOVO"]

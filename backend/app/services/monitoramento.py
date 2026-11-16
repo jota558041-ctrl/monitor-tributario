@@ -134,9 +134,12 @@ def executar(
                 elif resultado.disponibilidade == Disponibilidade.INDISPONIVEL:
                     indisponiveis += 1
                 comparativo = None
-                if anterior is not None and snapshot.disponibilidade == Disponibilidade.OK:
-                    if anterior.hash_conteudo != snapshot.hash_conteudo:
-                        mudancas += 1
+                if (anterior is not None
+                        and snapshot.disponibilidade == Disponibilidade.OK
+                        and anterior.hash_conteudo != snapshot.hash_conteudo):
+                    # Só grava comparativo quando o conteúdo mudou: consultas
+                    # idênticas em sequência não geram histórico redundante.
+                    mudancas += 1
                     comparativo = svc_fiscal.comparar(db, cliente, anterior, snapshot)
                 comps_cliente = list(db.scalars(
                     select(Compensacao).where(Compensacao.cliente_id == cliente.id)

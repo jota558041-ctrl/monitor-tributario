@@ -330,6 +330,32 @@ await etapa("gera a posição do cliente em PDF", async () => {
   confirmar(cabecalho === "%PDF-", `conteúdo não é PDF: ${cabecalho}`);
 });
 
+await etapa("anexa documento ao cliente e baixa de volta", async () => {
+  const { writeFileSync, mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const pasta = mkdtempSync(join(tmpdir(), "mt-anexo-"));
+  const arquivo = join(pasta, `despacho-${MARCA}.pdf`);
+  writeFileSync(arquivo, `%PDF-1.7\nDespacho decisório fictício ${MARCA}\n`);
+
+  await pagina.waitForSelector("text=Documentos anexados");
+  await pagina.setInputFiles("#arquivo-anexo", arquivo);
+  await pagina.fill("#campo-descri-o", `Despacho de teste ${MARCA}`);
+  await pagina.getByRole("button", { name: "Anexar" }).click();
+  await pagina.waitForSelector(".aviso.ok", { timeout: 20000 });
+  const texto = await pagina.textContent("main");
+  confirmar(texto.includes(`despacho-${MARCA}.pdf`), "documento não apareceu na lista");
+  confirmar(texto.includes("sha256"), "hash de integridade não exibido");
+
+  const linha = pagina.locator("tbody tr", { hasText: `despacho-${MARCA}.pdf` }).first();
+  const [download] = await Promise.all([
+    pagina.waitForEvent("download", { timeout: 30000 }),
+    linha.getByRole("button", { name: "Baixar" }).click(),
+  ]);
+  confirmar(download.suggestedFilename() === `despacho-${MARCA}.pdf`,
+    `nome inesperado: ${download.suggestedFilename()}`);
+  await capturar("21-documentos");
+});
+
 await etapa("sem erros de console no fluxo", async () => {
   const relevantes = errosConsole.filter((e) => !e.includes("favicon"));
   confirmar(relevantes.length === 0, `erros de console: ${relevantes.join(" | ")}`);

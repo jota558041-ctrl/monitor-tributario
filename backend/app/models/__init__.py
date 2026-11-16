@@ -2,6 +2,7 @@
 from app.models.alerta import Alerta, Notificacao, RegraMonitoramento
 from app.models.cliente import Cliente, ClienteHistorico
 from app.models.compensacao import Compensacao, CompensacaoEvento
+from app.models.documento import Documento
 from app.models.fiscal import SituacaoFiscalComparativo, SituacaoFiscalSnapshot
 from app.models.importacao import Importacao, ImportacaoLinha
 from app.models.integracao import CredencialIntegracao
@@ -11,7 +12,7 @@ from app.models.tenant import AuditLog, Organizacao, Usuario
 
 __all__ = [
     "Alerta", "AuditLog", "Cliente", "ClienteHistorico", "Compensacao",
-    "CompensacaoEvento", "CredencialIntegracao", "EstadoSimulado",
+    "CompensacaoEvento", "CredencialIntegracao", "Documento", "EstadoSimulado",
     "ExecucaoMonitoramento", "Importacao", "ImportacaoLinha", "Notificacao",
     "Organizacao", "Procuracao", "ProcuracaoConsulta", "RegraMonitoramento",
     "SituacaoFiscalComparativo", "SituacaoFiscalSnapshot", "Usuario",

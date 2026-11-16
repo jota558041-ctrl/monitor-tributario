@@ -71,6 +71,14 @@ export interface Comparativo {
   ressalva?: string | null; created_at: string;
 }
 
+export interface Documento {
+  id: string; cliente_id: string; entidade: string; entidade_id?: string | null;
+  categoria: string; nome_original: string; tipo_mime: string; tamanho_bytes: number;
+  sha256: string; descricao?: string | null; data_documento?: string | null;
+  restrito: boolean; enviado_por?: string | null; created_at: string;
+  pode_baixar?: boolean; aviso?: string;
+}
+
 export class ErroApi extends Error {
   constructor(public status: number, mensagem: string) { super(mensagem); }
 }

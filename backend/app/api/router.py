@@ -8,6 +8,7 @@ from app.api import (
     clientes,
     compensacoes,
     dashboard,
+    documentos,
     fiscal,
     ia,
     importacoes,
@@ -20,5 +21,5 @@ from app.api import (
 api_router = APIRouter()
 for modulo in (auth, clientes, importacoes, procuracoes, compensacoes, fiscal,
                alertas, dashboard, monitoramento, ia, auditoria, integracoes,
-               relatorios):
+               relatorios, documentos):
     api_router.include_router(modulo.router)

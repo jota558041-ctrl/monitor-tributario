@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     ia_llm_model: str = "claude-sonnet-5-5"
     anthropic_api_key: str = ""
 
+    # --- Armazenamento de anexos ---
+    arquivos_dir: str = ""          # vazio => <raiz do projeto>/arquivos
+    upload_max_mb: int = 25
+
     # --- Retenção / LGPD ---
     retencao_consultas_dias: int = 1825   # 5 anos
     retencao_auditoria_dias: int = 1825
