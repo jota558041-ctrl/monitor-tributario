@@ -45,7 +45,7 @@ const MARCA = Date.now().toString().slice(-8);
 const CNPJ_NOVO = gerarCnpj(Number(MARCA));
 const RAZAO_NOVA = `Empresa Cadastrada na Tela ${MARCA} Ltda`;
 
-async function etapa(nome, fn) {
+async function etapa(nome, fn, { essencial = false } = {}) {
   try {
     await fn();
     resultados.push({ nome, status: "OK" });
@@ -54,6 +54,16 @@ async function etapa(nome, fn) {
     falhas += 1;
     resultados.push({ nome, status: "FALHOU", erro: String(erro.message ?? erro) });
     console.log(`  FALHOU ${nome}: ${erro.message ?? erro}`);
+    if (essencial) {
+      // Sem login (ou sem a tela inicial) todas as etapas seguintes apenas
+      // esperariam seletores que nunca aparecem: melhor falhar de imediato.
+      console.log("  >> etapa essencial falhou; interrompendo o fluxo.");
+      await pagina.screenshot({ path: join(CAPTURAS, "falha-essencial.png"), fullPage: true })
+        .catch(() => {});
+      await navegador.close();
+      console.log(`\n${resultados.length - falhas}/${resultados.length} etapas OK (fluxo abortado).`);
+      process.exit(1);
+    }
   }
 }
 
@@ -77,7 +87,7 @@ await etapa("tela de login é exibida", async () => {
   await pagina.goto(`${BASE}/login`, { waitUntil: "networkidle" });
   confirmar(await pagina.getByRole("heading", { name: "Entrar" }).isVisible(), "título 'Entrar' ausente");
   await capturar("01-login");
-});
+}, { essencial: true });
 
 await etapa("login com credenciais de demonstração", async () => {
   await pagina.fill("#email", "admin@monitortributario.com.br");
@@ -85,7 +95,7 @@ await etapa("login com credenciais de demonstração", async () => {
   await pagina.getByRole("button", { name: "Entrar" }).click();
   await pagina.waitForURL(`${BASE}/`, { timeout: 15000 });
   await pagina.waitForSelector(".kpi .valor");
-});
+}, { essencial: true });
 
 await etapa("painel mostra indicadores e aviso de modo demonstração", async () => {
   const texto = await pagina.textContent("main");

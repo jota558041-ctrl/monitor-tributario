@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # campos sensíveis. Se vazia, derivada da secret_key (apenas dev).
     fernet_key: str = ""
     password_min_length: int = 10
+    # Proteção contra força bruta no login
+    login_max_tentativas: int = 5
+    login_bloqueio_minutos: int = 15
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 
     # --- Conectores de dados (fontes de informação fiscal) ---
@@ -54,6 +57,8 @@ class Settings(BaseSettings):
     integra_contador_contratante_cnpj: str = ""
     integra_contador_autor_pedido_cnpj: str = ""
     integra_contador_rate_limit_rpm: int = 30
+    # Modo homologação: grava requisição e resposta brutas para mapeamento de campos
+    integra_contador_modo_homologacao: bool = False
 
     # --- Monitoramento agendado ---
     scheduler_enabled: bool = True

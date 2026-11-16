@@ -126,6 +126,10 @@ Todas usam o prefixo `MT_`. As principais:
 | `MT_CONSULTA_DESATUALIZADA_DIAS` | 7 | limite de frescor da informação |
 | `MT_ALERTA_PROCURACAO_DIAS` | `[30,15,7,0]` | faixas de alerta de vencimento |
 | `MT_EMAIL_ENABLED` + `MT_SMTP_*` | desligado | envio de e-mail |
+| `MT_LOGIN_MAX_TENTATIVAS` / `MT_LOGIN_BLOQUEIO_MINUTOS` | 5 / 15 | bloqueio temporário contra força bruta |
+| `MT_ARQUIVOS_DIR` | `<raiz>/arquivos` | onde ficam os anexos |
+| `MT_UPLOAD_MAX_MB` | 25 | tamanho máximo de anexo |
+| `MT_INTEGRA_CONTADOR_MODO_HOMOLOGACAO` | `false` | grava respostas brutas para mapeamento |
 | `MT_IA_LLM_ENABLED` + `MT_ANTHROPIC_API_KEY` | desligado | redação opcional por LLM |
 | `MT_INTEGRA_CONTADOR_*` | desligado | ver `INTEGRACAO_RECEITA_FEDERAL.md` |
 
@@ -141,6 +145,9 @@ Todas usam o prefixo `MT_`. As principais:
       **nunca** deixar `simulador` em produção
 - [ ] Agendador ativo em **uma única** instância do backend
 - [ ] Volume `certificados/` com permissão restrita (0400) e fora do versionamento
+- [ ] Volume de anexos (`MT_ARQUIVOS_DIR`) em disco persistente e incluído no backup
+- [ ] Backup automatizado **e restauração testada** (`backend/scripts/`, ver OPERACAO.md)
+- [ ] Rodar o checklist em *Fontes de dados* → **Prontidão para produção** e zerar os itens críticos
 - [ ] Monitorar `/api/health` e o log de execuções
 
 ## 7. Problemas comuns
@@ -153,3 +160,5 @@ Todas usam o prefixo `MT_`. As principais:
 | Todos os semáforos cinza | nenhuma consulta executada ainda | rode Monitoramento → Executar |
 | Agendador inativo | `MT_SCHEDULER_ENABLED=false` | ligue a variável e reinicie |
 | E-mails em `DESABILITADO` | `MT_EMAIL_ENABLED=false` | configure SMTP e ligue a variável |
+| Login respondendo 429 | bloqueio por tentativas malsucedidas | aguarde o prazo informado em `Retry-After` ou peça a um ADMIN para redefinir a senha |
+| Anexo recusado | extensão fora da lista ou conteúdo incompatível | confira os tipos aceitos em *Documentos* na ficha do cliente |

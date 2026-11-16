@@ -1,20 +1,37 @@
 # Relatório de testes
 
-**Data da execução:** 16/11/2026
+**Data da execução:** 16/11/2026 (atualizado após os módulos de CRUD, relatórios, documentos e produção)
 **Ambiente:** Python 3.13.18 · Node 22.23.4 · PostgreSQL 16.15 · Chromium (Playwright)
 
 ## 1. Resumo
 
 | Suíte | Itens | Resultado | Tempo |
 |---|---|---|---|
-| Backend — SQLite | 53 testes | **53 passaram** | 38,0 s |
-| Backend — PostgreSQL 16 | 53 testes | **53 passaram** | 38,2 s |
-| Interface — Playwright | 17 etapas | **17 passaram** | ~40 s |
-| Migração Alembic | upgrade → downgrade → upgrade | **OK** (20 tabelas, reversível) | — |
-| Build do frontend | `tsc -b && vite build` | **OK**, sem erro de tipo | 3,0 s |
+| Backend — SQLite | 85 testes | **85 passaram** | 87 s |
+| Backend — PostgreSQL 16 | 85 testes | **85 passaram** | 87 s |
+| Interface — Playwright | 25 etapas | **25 passaram** | ~90 s |
+| Migrações Alembic (0001→0003) | upgrade → downgrade → upgrade | **OK** (22 tabelas, reversível) | — |
+| Backup e restauração | ciclo completo com perda simulada | **OK** (dados recompostos) | — |
+| Build do frontend | `tsc -b && vite build` | **OK**, sem erro de tipo | 3,4 s |
+| Lint do backend | `ruff check` | **OK**, sem apontamentos | — |
 | Carga demonstrativa | `scripts.seed --reset` | **OK** em SQLite e PostgreSQL | — |
 
+Distribuição dos 85 testes: validação (23), regras de negócio (19), API e
+permissões (12), documentos (12), produção e hardening (7), CRUD (6) e
+relatórios (6).
+
 Nenhuma falha pendente. Nenhum erro de console no navegador durante o fluxo.
+
+## 1.1 Defeitos encontrados e corrigidos durante os testes
+
+Os testes não serviram só de carimbo — três defeitos reais apareceram e foram
+corrigidos:
+
+| # | Defeito | Como apareceu | Correção |
+|---|---|---|---|
+| 1 | Valores `Decimal` quebravam a gravação de payloads JSON | teste de registro manual de PER/DCOMP falhou com `TypeError` | conversor `app/core/serial.py` aplicado em todos os payloads |
+| 2 | Comparativos redundantes de R$ 0,00 a cada execução sem mudança | inspeção visual da ficha do cliente após várias execuções | comparativo só é gravado quando o conteúdo muda (há teste cobrindo) |
+| 3 | Banco de desenvolvimento desatualizado em relação ao modelo derrubava o login (HTTP 500) | o fluxo de interface falhou logo no login após a migração 0003 | base recriada; o teste de interface passou a abortar cedo em falha essencial, em vez de arrastar 25 etapas |
 
 ## 2. Testes de validação (23)
 `backend/tests/test_validacao.py`
@@ -101,7 +118,60 @@ Nenhuma falha pendente. Nenhum erro de console no navegador durante o fluxo.
 * `/api/integracoes/status` publica limitações e as 4 regras de ouro.
 * Segregação por organização: cliente de outra empresa não é listado e retorna 404.
 
-## 5. Teste de interface (17 etapas)
+## 4.1 Testes de CRUD e permissões (6)
+`backend/tests/test_crud.py`
+
+| Teste | Garante |
+|---|---|
+| `editar_cliente_registra_historico` | alteração cadastral grava histórico campo a campo |
+| `procuracao_manual_nao_fica_validada` | lançamento manual nasce `DESCONHECIDA`/**CINZA** |
+| `editar_procuracao_nao_valida_por_fonte` | editar à mão não marca `validada_por_fonte` |
+| `editar_compensacao_nao_muda_situacao_e_gera_evento` | situação não muda por edição; evento `EDICAO_MANUAL` é criado |
+| `exclusao_restrita_a_admin` | analista recebe 403; admin exclui e a ação fica auditada |
+| `gestao_de_usuarios` | criação, senha fraca recusada, desativação bloqueia login, troca de perfil |
+
+## 4.2 Testes de relatórios (6)
+`backend/tests/test_relatorios.py`
+
+* Carteira em Excel com as abas Clientes, Procurações, PER-DCOMP, Situação
+  fiscal e **Procedência** — esta última contendo o aviso de que transmissão
+  não equivale a homologação e o alerta de fonte em modo simulador.
+* PDF do cliente íntegro (`%PDF-`), com mais de 2 KB de conteúdo.
+* PDF de cliente de outra organização retorna 404.
+* Relação de alertas traz as colunas "Por que foi gerado" e "Consulta da evidência".
+* Extrato de consultas com cabeçalho e linhas.
+* Geração de relatório fica registrada na auditoria; perfil AUDITOR pode exportar.
+
+## 4.3 Testes de documentos (12)
+`backend/tests/test_documentos.py`
+
+| Teste | Garante |
+|---|---|
+| `upload_grava_metadados_e_arquivo` | categoria, tipo, tamanho e SHA-256 registrados |
+| `download_devolve_conteudo_e_registra_auditoria` | conteúdo idêntico e evento `DOCUMENTO_VISUALIZADO` |
+| `arquivos_recusados` (3 casos) | `.exe` recusado, `.pdf` falso recusado, arquivo vazio recusado |
+| `tamanho_maximo` | limite configurável respeitado |
+| `documento_restrito_exige_admin` | analista vê na lista mas recebe 403; tentativa é auditada |
+| `duplicidade_avisa` | conteúdo idêntico é sinalizado pelo hash |
+| `exclusao_apaga_arquivo_e_exige_admin` | analista 403; admin exclui e o arquivo some do disco |
+| `integridade_detecta_arquivo_adulterado` | arquivo alterado no disco → 410, não entrega silenciosa |
+| `segregacao_por_organizacao` | documento de outra empresa não é listado nem baixado |
+| `vinculo_com_perdcomp` | anexo associado a uma PER/DCOMP específica |
+
+## 4.4 Testes de produção e hardening (7)
+`backend/tests/test_producao.py`
+
+| Teste | Garante |
+|---|---|
+| `bloqueio_apos_tentativas_falhas` | 5 falhas → 429 com `Retry-After`; **nem a senha correta entra** durante o bloqueio; expirado o prazo, acesso e contadores normalizam |
+| `bloqueio_registrado_na_auditoria` | evento `LOGIN_BLOQUEADO` gravado |
+| `prontidao_aponta_pendencias_do_ambiente` | checklist acusa fonte em simulador como crítico |
+| `prontidao_restrita_a_admin` | analista recebe 403 |
+| `amostras_vazias_por_padrao` | modo homologação desligado de fábrica |
+| `modo_homologacao_captura_amostra` | falha de chamada vira amostra com erro e `INDISPONIVEL` — nunca "regular" |
+| `scripts_de_backup_existem_e_sao_executaveis` | scripts presentes, com `set -euo pipefail`, hash e trava de sobrescrita |
+
+## 5. Teste de interface (25 etapas)
 `e2e/fluxo-ui.mjs` — Playwright/Chromium, capturas em `e2e/capturas/`
 
 | # | Etapa | Verificação |
@@ -122,7 +192,19 @@ Nenhuma falha pendente. Nenhum erro de console no navegador durante o fluxo.
 | 14 | Auditoria | registros de login e monitoramento |
 | 15 | Importação | assistente e histórico |
 | 16 | Importação da planilha de teste | mapeamento de CNPJ, 1 linha com erro e 1 duplicada sinalizadas |
-| 17 | Console | nenhum erro de JavaScript em todo o fluxo |
+| 17 | Cadastro de cliente pela tela | cliente novo aparece na lista |
+| 18 | CNPJ inválido na tela | recusado com mensagem clara |
+| 19 | Procuração manual | entra como **CINZA**/desconhecida |
+| 20 | PER/DCOMP manual | entra como "sem informação atualizada" |
+| 21 | Gestão de usuários | lista e ação de redefinir senha (apenas ADMIN) |
+| 22 | Exportar carteira | download `.xlsx` concluído |
+| 23 | Posição em PDF | arquivo baixado começa com `%PDF-` |
+| 24 | Anexo de documento | upload, hash exibido e download de volta com o mesmo nome |
+| 25 | Console | nenhum erro de JavaScript em todo o fluxo |
+
+O fluxo é **idempotente**: gera CNPJ válido e identificadores únicos a cada
+execução, podendo rodar quantas vezes for preciso contra a mesma base. Etapas
+essenciais (tela inicial e login) interrompem o fluxo quando falham.
 
 ## 6. Carga demonstrativa verificada
 
@@ -145,12 +227,24 @@ PER/DCOMP com intimação; parcelamento + obrigação acessória + débito suspe
 cliente nunca consultado. A planilha de teste inclui ainda uma linha com CNPJ
 inválido e uma PER/DCOMP duplicada, para exercitar validação e correção.
 
+## 6.1 Backup e restauração (ciclo completo)
+
+| Passo | Resultado |
+|---|---|
+| Base com 10 clientes, 13 PER/DCOMP, 22 alertas e anexos | — |
+| `scripts/backup.sh` | dump + anexos + hashes gerados |
+| `sha256sum -c` | OK nos dois arquivos |
+| `TRUNCATE cliente CASCADE` (perda simulada) | 0 clientes |
+| `scripts/restaurar.sh` em banco separado | 10 clientes, 13 PER/DCOMP, 22 alertas |
+| Restauração sobre o banco em uso, sem confirmação | **recusada** (trava funcionou) |
+| Restauração com `PERMITIR_SOBRESCREVER=1` | base recomposta |
+
 ## 7. Compatibilidade de banco verificada
 
 ```
-PostgreSQL 16.15 — 53/53 testes, seed completo, 19 tabelas criadas
-SQLite  3.x      — 53/53 testes, seed completo
-Alembic          — upgrade (20 tabelas) → downgrade (0) → upgrade (20)
+PostgreSQL 16.15 — 85/85 testes, seed completo, 21 tabelas criadas
+SQLite  3.x      — 85/85 testes, seed completo
+Alembic          — 0001 → 0002 → 0003, upgrade (22 tabelas) → downgrade → upgrade
 ```
 
 ## 8. Como reproduzir
@@ -189,3 +283,10 @@ node e2e/fluxo-ui.mjs http://127.0.0.1:8000
    cliente. O PostgreSQL foi validado diretamente, fora de contêiner.
 5. Não há ainda teste de carga/performance com volume elevado (milhares de
    clientes × consultas diárias).
+6. O **modo homologação** foi exercitado apenas com falha de chamada (sem
+   contrato ativo): comprova que o erro vira amostra e resulta em
+   `INDISPONIVEL`, mas o formato real da resposta só poderá ser conferido com
+   acesso ao contrato.
+7. Bancos criados antes de uma migração precisam ser migrados (`alembic upgrade
+   head`) ou recriados — foi o que causou o defeito nº 3 da seção 1.1 no
+   ambiente de desenvolvimento.

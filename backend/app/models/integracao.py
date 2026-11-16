@@ -24,6 +24,31 @@ class TextoCriptografado(TypeDecorator):
         return decrypt(value)
 
 
+class AmostraIntegracao(UUIDPk, Base):
+    """Captura de requisição/resposta brutas das fontes, em modo homologação.
+
+    Serve exclusivamente para mapear os campos reais de um contrato novo. Fica
+    desligada por padrão (MT_INTEGRA_CONTADOR_MODO_HOMOLOGACAO=false) porque as
+    respostas podem conter dados fiscais completos do contribuinte, e seu
+    acesso é restrito ao perfil ADMIN.
+    """
+    __tablename__ = "amostra_integracao"
+
+    organizacao_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    dominio: Mapped[str] = mapped_column(String(40), nullable=False)      # procuracao, ...
+    provedor: Mapped[str] = mapped_column(String(60), nullable=False)
+    contribuinte: Mapped[str | None] = mapped_column(String(14))
+    id_sistema: Mapped[str | None] = mapped_column(String(60))
+    id_servico: Mapped[str | None] = mapped_column(String(60))
+    http_status: Mapped[int | None] = mapped_column()
+    disponibilidade: Mapped[str | None] = mapped_column(String(30))
+    requisicao: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    resposta: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    erro: Mapped[str | None] = mapped_column(Text)
+    duracao_ms: Mapped[int | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
 class CredencialIntegracao(UUIDPk, Timestamps, Base):
     """Credenciais de acesso a fontes oficiais.
 

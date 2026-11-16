@@ -1,11 +1,14 @@
 """Autenticação e gestão de usuários."""
 from __future__ import annotations
 
+from datetime import UTC, timedelta
+
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.deps import DbSession, SomenteAdmin, UsuarioAtual, client_ip
 from app.core.auditoria import registrar
+from app.core.config import settings
 from app.core.db import utcnow
 from app.core.security import (
     criar_access_token,
@@ -23,9 +26,31 @@ router = APIRouter(tags=["Autenticação"])
 def login(dados: LoginIn, request: Request, db: DbSession) -> TokenOut:
     usuario = db.scalar(select(Usuario).where(Usuario.email == str(dados.email).lower()))
     ip = client_ip(request)
+    agora = utcnow()
+
+    if usuario is not None and usuario.bloqueado_ate is not None:
+        bloqueio = usuario.bloqueado_ate
+        if bloqueio.tzinfo is None:
+            bloqueio = bloqueio.replace(tzinfo=UTC)
+        if bloqueio > agora:
+            restam = max(1, int((bloqueio - agora).total_seconds() // 60) + 1)
+            registrar(db, acao="LOGIN_BLOQUEADO", organizacao_id=usuario.organizacao_id,
+                      usuario_id=usuario.id, usuario_email=usuario.email, ip=ip,
+                      detalhe={"bloqueado_ate": bloqueio.isoformat()}, commit=True)
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"Acesso temporariamente bloqueado por excesso de tentativas. "
+                f"Tente novamente em {restam} minuto(s).",
+                headers={"Retry-After": str(restam * 60)},
+            )
+        usuario.bloqueado_ate = None
+        usuario.tentativas_falhas = 0
+
     if usuario is None or not verificar_senha(dados.senha, usuario.senha_hash):
         if usuario is not None:
             usuario.tentativas_falhas += 1
+            if usuario.tentativas_falhas >= settings.login_max_tentativas:
+                usuario.bloqueado_ate = agora + timedelta(minutes=settings.login_bloqueio_minutos)
         registrar(db, acao="LOGIN_FALHA", usuario_email=str(dados.email).lower(), ip=ip,
                   user_agent=request.headers.get("user-agent"),
                   organizacao_id=usuario.organizacao_id if usuario else None, commit=True)
@@ -33,8 +58,9 @@ def login(dados: LoginIn, request: Request, db: DbSession) -> TokenOut:
     if not usuario.ativo:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Usuário desativado.")
 
-    usuario.ultimo_login = utcnow()
+    usuario.ultimo_login = agora
     usuario.tentativas_falhas = 0
+    usuario.bloqueado_ate = None
     token, expira = criar_access_token(
         usuario_id=usuario.id, organizacao_id=usuario.organizacao_id,
         perfil=usuario.perfil, email=usuario.email,

@@ -46,7 +46,7 @@ const TITULOS: Record<string, { titulo: string; sub: string }> = {
   "/procuracoes": { titulo: "Procurações eletrônicas", sub: "Semáforo de validade — situação só é considerada após validação por fonte" },
   "/situacao-fiscal": { titulo: "Situação fiscal", sub: "Snapshots por consulta e comparação entre períodos" },
   "/monitoramento": { titulo: "Monitoramento", sub: "Execuções, agendamentos e simulador de mudanças" },
-  "/integracoes": { titulo: "Fontes de dados", sub: "Capacidades, limitações e requisitos de cada fonte" },
+  "/integracoes": { titulo: "Fontes de dados", sub: "Capacidades, limitações, prontidão para produção e amostras de homologação" },
   "/auditoria": { titulo: "Trilha de auditoria", sub: "Quem acessou ou alterou cada informação" },
   "/usuarios": { titulo: "Usuários", sub: "Perfis de acesso, ativação e redefinição de senha" },
 };

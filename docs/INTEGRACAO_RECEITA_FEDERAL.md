@@ -125,6 +125,24 @@ MT_IC_PROCURACOES_ID_SISTEMA=<catálogo oficial>
 MT_IC_PROCURACOES_ID_SERVICO=<catálogo oficial>
 ```
 
+### Modo homologação (mapeamento assistido)
+
+Antes de confiar no mapeamento, ligue:
+
+```bash
+MT_INTEGRA_CONTADOR_MODO_HOMOLOGACAO=true
+```
+
+Cada chamada passa a gravar, na tabela `amostra_integracao`, a requisição
+enviada, a resposta recebida (ou o erro), o status HTTP e a duração. Consulte
+em **Fontes de dados → Amostras de homologação** (perfil ADMIN) ou em
+`GET /api/sistema/amostras-integracao`.
+
+É com essas amostras que se ajusta o mapeamento real dos campos — em vez de
+adivinhar o formato. **Desligue o modo e apague as amostras ao terminar**: elas
+contêm dados fiscais completos do contribuinte. O checklist de prontidão para
+produção acusa o modo ligado.
+
 ### Roteiro de homologação sugerido
 
 1. Ligar a integração **para um único cliente de teste** (escopo da regra de
@@ -133,7 +151,8 @@ MT_IC_PROCURACOES_ID_SERVICO=<catálogo oficial>
 3. Rodar `POST /api/situacao-fiscal/{cliente}/consultar` e inspecionar o snapshot:
    a resposta bruta fica em `relatorio_bruto`/payload para mapeamento.
 4. Ajustar o mapeamento de campos (`app/services/fiscal.py::normalizar_pendencias`
-   e `app/services/compensacoes.py::_mapear_payload`) ao formato real do contrato.
+   e `app/services/compensacoes.py::_mapear_payload`) ao formato real do
+   contrato, usando as amostras capturadas no modo homologação.
 5. Só então ampliar o escopo e ativar o agendamento.
 
 > O relatório do SITFIS é **assíncrono** (solicitação de protocolo + download).

@@ -194,8 +194,27 @@ class _BaseIntegra:
             mensagem=motivo,
         )
 
+    def _amostrar(self, **campos: Any) -> None:
+        """Em modo homologação, guarda requisição e resposta para mapeamento."""
+        if not settings.integra_contador_modo_homologacao or self.db is None:
+            return
+        try:
+            from app.core.db import utcnow
+            from app.core.serial import para_json
+            from app.models.integracao import AmostraIntegracao
+
+            self.db.add(AmostraIntegracao(
+                dominio=self.dominio, provedor="INTEGRA_CONTADOR",
+                created_at=utcnow(), **{k: para_json(v) if k in ("requisicao", "resposta") else v
+                                        for k, v in campos.items()},
+            ))
+            self.db.flush()
+        except Exception:  # noqa: BLE001 - amostragem nunca derruba a consulta
+            pass
+
     def _executar(self, contribuinte: str, dados: dict[str, Any]) -> ResultadoConsulta:
         import os
+        import time
 
         if not self.disponivel_oficialmente:
             return self._nao_autorizado(
@@ -211,13 +230,27 @@ class _BaseIntegra:
                 f"Identificadores de serviço não configurados ({self.env_sistema}/{self.env_servico}). "
                 "Preencha com os valores do catálogo oficial do contrato."
             )
+        inicio = time.monotonic()
         try:
             bruto = _client.consultar(
                 id_sistema=id_sistema, id_servico=id_servico,
                 contribuinte=contribuinte, dados=dados,
             )
         except Exception as exc:  # noqa: BLE001 - qualquer falha é indisponibilidade
+            self._amostrar(
+                contribuinte=contribuinte, id_sistema=id_sistema, id_servico=id_servico,
+                requisicao=dados, resposta=None, erro=f"{type(exc).__name__}: {exc}",
+                disponibilidade=str(Disponibilidade.INDISPONIVEL),
+                duracao_ms=int((time.monotonic() - inicio) * 1000),
+            )
             return self._indisponivel(f"Falha na chamada à API: {type(exc).__name__}: {exc}")
+
+        self._amostrar(
+            contribuinte=contribuinte, id_sistema=id_sistema, id_servico=id_servico,
+            requisicao=dados, resposta=bruto, http_status=200,
+            disponibilidade=str(Disponibilidade.OK),
+            duracao_ms=int((time.monotonic() - inicio) * 1000),
+        )
         return ResultadoConsulta(
             disponibilidade=Disponibilidade.OK,
             origem=OrigemInformacao.API_INTEGRA_CONTADOR,

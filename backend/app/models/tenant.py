@@ -35,6 +35,8 @@ class Usuario(UUIDPk, Timestamps, Base):
     deve_trocar_senha: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ultimo_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tentativas_falhas: Mapped[int] = mapped_column(default=0, nullable=False)
+    # Bloqueio temporário após sucessivas falhas de autenticação
+    bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     organizacao: Mapped[Organizacao] = relationship(back_populates="usuarios")
 

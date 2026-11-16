@@ -34,6 +34,8 @@ services:
       MT_CONNECTOR_SITUACAO_FISCAL: ${MT_CONNECTOR_SITUACAO_FISCAL:-simulador}
       MT_SCHEDULER_ENABLED: ${MT_SCHEDULER_ENABLED:-true}
       MT_EMAIL_ENABLED: ${MT_EMAIL_ENABLED:-false}
+      MT_ARQUIVOS_DIR: /anexos
+      MT_UPLOAD_MAX_MB: ${MT_UPLOAD_MAX_MB:-25}
       MT_CORS_ORIGINS: '["http://localhost:8080","http://127.0.0.1:8080"]'
       # Integra Contador (opcional; ver docs/INTEGRACAO_RECEITA_FEDERAL.md)
       MT_INTEGRA_CONTADOR_ENABLED: ${MT_INTEGRA_CONTADOR_ENABLED:-false}
@@ -46,6 +48,7 @@ services:
     volumes:
       # Certificado digital em volume somente leitura (nunca na imagem)
       - ./certificados:/certificados:ro
+      - anexos:/anexos
       - ./data:/app/../data
     command: >
       sh -c "alembic upgrade head &&
@@ -65,3 +68,4 @@ services:
 
 volumes:
   dados-postgres:
+  anexos:

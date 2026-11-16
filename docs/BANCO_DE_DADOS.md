@@ -2,17 +2,19 @@
 
 PostgreSQL 16 em produção; SQLite é suportado para desenvolvimento e testes
 (mesmos modelos, sem recurso exclusivo de um dialeto). Esquema versionado com
-Alembic — revisão inicial `0001_inicial`, aplicada e revertida com sucesso.
+Alembic — revisões `0001_inicial`, `0002_documentos` e `0003_bloqueio_amostras`,
+todas aplicadas e revertidas com sucesso.
 
-## Mapa das 19 tabelas
+## Mapa das 21 tabelas
 
 ### Identidade e governança
 | Tabela | Função | Pontos relevantes |
 |---|---|---|
 | `organizacao` | Tenant (escritório) | toda entidade de negócio referencia `organizacao_id` |
-| `usuario` | Acesso | `senha_hash` bcrypt, `perfil` ADMIN/ANALISTA/AUDITOR, único por (org, e-mail) |
+| `usuario` | Acesso | `senha_hash` bcrypt, `perfil` ADMIN/ANALISTA/AUDITOR, único por (org, e-mail), `bloqueado_ate` para conter força bruta |
 | `audit_log` | Trilha de auditoria | ação, entidade, usuário, IP, detalhe JSON, data |
 | `credencial_integracao` | Credenciais de fontes | `consumer_key`, `consumer_secret` e senha de certificado **cifrados** (Fernet) |
+| `amostra_integracao` | Capturas de homologação | requisição e resposta brutas da fonte, gravadas só com o modo homologação ligado; acesso restrito a ADMIN |
 
 ### Cadastro
 | Tabela | Função | Pontos relevantes |
@@ -21,6 +23,7 @@ Alembic — revisão inicial `0001_inicial`, aplicada e revertida com sucesso.
 | `cliente_historico` | Histórico cadastral | campo, valor anterior, valor novo, origem, autor |
 | `importacao` | Lote de importação | mapeamento de colunas, colunas ignoradas, resumo, status |
 | `importacao_linha` | Staging linha a linha | dados brutos, normalizados, erros, avisos, ação, seleção |
+| `documento` | Anexos | metadados do arquivo (categoria, vínculo, tamanho, tipo, SHA-256, autor); o binário fica em volume, fora do banco |
 
 ### Procurações
 | Tabela | Função | Pontos relevantes |
@@ -54,6 +57,7 @@ Alembic — revisão inicial `0001_inicial`, aplicada e revertida com sucesso.
 ```
 organizacao 1─┬─N usuario
               ├─N cliente ─┬─N procuracao ──N procuracao_consulta
+              │            ├─N documento
               │            ├─N compensacao ──N compensacao_evento
               │            ├─N situacao_fiscal_snapshot
               │            ├─N situacao_fiscal_comparativo
@@ -91,6 +95,12 @@ em `compensacao`; `(cliente_id, consultado_em)` em `situacao_fiscal_snapshot`;
 
 ## Migrações
 
+| Revisão | Conteúdo |
+|---|---|
+| `0001_inicial` | 19 tabelas da estrutura original |
+| `0002_documentos` | tabela `documento` (anexos) |
+| `0003_bloqueio_amostras` | `usuario.bloqueado_ate` e tabela `amostra_integracao` |
+
 ```bash
 cd backend
 alembic upgrade head          # aplica
@@ -103,10 +113,17 @@ Em SQLite, `render_as_batch` é ativado automaticamente para permitir `ALTER`.
 
 ## Backup e retenção
 
+Use os scripts testados (banco **e** anexos, com verificação de integridade):
+
 ```bash
-docker compose exec db pg_dump -U monitor -Fc monitor > backups/monitor-$(date +%F).dump
-docker compose exec -T db pg_restore -U monitor -d monitor --clean < backups/arquivo.dump
+cd backend && ./scripts/backup.sh /var/backups/monitor
 ```
+
+```bash
+cd backend && ./scripts/restaurar.sh /var/backups/monitor/monitor-AAAAMMDD-HHMMSS.dump monitor_restaurado
+```
+
+Detalhes e rotina sugerida em [OPERACAO.md](OPERACAO.md).
 
 Parâmetros de retenção (dias): `MT_RETENCAO_CONSULTAS_DIAS` (padrão 1825) e
 `MT_RETENCAO_AUDITORIA_DIAS` (padrão 1825). A rotina de expurgo deve respeitar

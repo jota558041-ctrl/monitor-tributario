@@ -69,7 +69,10 @@ Primeira tela após o login. Traz, com filtro por responsável:
 ## 3. Clientes
 
 Lista com busca por CNPJ, razão social ou nome fantasia e filtro por
-responsável. Abrir um cliente mostra:
+responsável. Dois botões no topo: **Novo cliente** (cadastro manual, com
+validação do CNPJ) e **Exportar carteira (Excel)**.
+
+Abrir um cliente mostra:
 
 * dados cadastrais e data da última consulta de cada domínio;
 * **Resumo interpretado** (motor de regras), com os limites da interpretação;
@@ -79,7 +82,33 @@ responsável. Abrir um cliente mostra:
 * comparativos entre consultas;
 * alertas do cliente e histórico de alterações cadastrais.
 
-O botão **Consultar agora** executa o monitoramento completo só daquele cliente.
+Botões disponíveis na ficha:
+
+| Botão | O que faz |
+|---|---|
+| **Consultar agora** | executa o monitoramento completo só daquele cliente |
+| **Posição em PDF** | gera o relatório completo do cliente para enviar ao responsável |
+| **Extrato de consultas** | planilha com todas as consultas feitas nos últimos 180 dias |
+| **Editar cliente** | altera os dados cadastrais (o CNPJ não é editável) |
+| **Nova procuração** / **Nova PER/DCOMP** | lançamento manual, sem planilha |
+
+Em cada linha de procuração e de PER/DCOMP há **Editar** e, para administradores,
+**Excluir**. Lançar ou editar à mão **não** valida a procuração nem muda a
+situação da compensação: isso continua dependendo de consulta à fonte ou do
+registro de resultado oficial.
+
+### Documentos anexados
+
+No bloco **Documentos anexados** é possível guardar despacho decisório,
+intimação, relatório do e-CAC, comprovante de PER/DCOMP e contratos:
+
+* tipos aceitos: PDF, PNG, JPG, XLSX, XLS, CSV, TXT e XML, até o limite exibido
+  na tela (padrão 25 MB);
+* o arquivo pode ser vinculado a uma PER/DCOMP específica;
+* marcando **Restrito**, só administradores conseguem baixar;
+* cada arquivo mostra o início do SHA-256 — é a prova de integridade, conferida
+  a cada download;
+* **todo download é registrado na auditoria**, com usuário e data.
 
 ---
 
@@ -198,9 +227,29 @@ declaradas**, além do status do Integra Contador. É a tela que responde
 
 ---
 
+## 9.1 Prontidão para produção (ADMIN)
+
+Ainda em **Fontes de dados**, o painel **Prontidão para produção** roda um
+checklist automático da configuração: chaves, banco, fontes ativas, CORS,
+usuários de demonstração, bloqueio de login, agendador, e-mail e retenção.
+Cada item mostra como está e o que fazer. Itens críticos devem ser zerados
+antes de liberar o acesso a usuários reais.
+
+Abaixo dele, **Amostras de homologação** lista as capturas de requisição e
+resposta das fontes — úteis para mapear os campos de um contrato novo e que
+devem ser apagadas ao fim do mapeamento.
+
+## 9.2 Usuários (ADMIN)
+
+Menu **Usuários**: criar, trocar perfil, ativar/desativar e redefinir senha.
+Senha exige 10 caracteres com letra, número e caractere especial. Após 5
+tentativas malsucedidas a conta fica bloqueada por 15 minutos — nesse período
+nem a senha correta entra, e o bloqueio aparece na auditoria.
+
 ## 10. Auditoria
 
 Disponível para ADMIN e AUDITOR. Registra login (inclusive falhas), leitura de
-ficha de cliente, criações, alterações, importações, consultas às fontes,
-resultados manuais, simulações, resumos de IA e tratamento de alertas — com
-usuário, IP, entidade afetada e detalhe.
+ficha de cliente, criações, alterações, exclusões, importações, consultas às
+fontes, resultados manuais, simulações, resumos de IA, tratamento de alertas,
+geração de relatórios e todo o ciclo dos documentos (anexo, download, acesso
+negado e exclusão) — com usuário, IP, entidade afetada e detalhe.

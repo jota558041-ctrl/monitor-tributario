@@ -84,17 +84,27 @@ documentação interativa em `http://localhost:8000/docs`.
    gráficos e filtros.
 8. **Alertas automáticos** — regras com cron, criticidade mínima, escopo de
    clientes, notificações em sistema e e-mail (preparado), deduplicação.
+9. **Documentos** — anexo de despacho decisório, intimação e relatórios do
+   e-CAC, com validação de tipo por assinatura, SHA-256, marcação de documento
+   restrito (download só para ADMIN) e registro de quem baixou.
+10. **Relatórios** — carteira consolidada, relação de alertas e extrato de
+    consultas em Excel; posição do cliente em PDF. Toda exportação carrega a
+    procedência dos dados.
+11. **Governança** — gestão de usuários e perfis, trilha de auditoria,
+    bloqueio temporário após tentativas de login malsucedidas e checklist
+    automatizado de prontidão para produção.
 
 ## Documentação
 
 | Documento | Conteúdo |
 |---|---|
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Visão de componentes, fluxos e decisões de projeto |
-| [docs/BANCO_DE_DADOS.md](docs/BANCO_DE_DADOS.md) | 19 tabelas, relacionamentos e migrações |
+| [docs/BANCO_DE_DADOS.md](docs/BANCO_DE_DADOS.md) | 21 tabelas, relacionamentos e migrações |
 | [docs/INSTALACAO.md](docs/INSTALACAO.md) | Instalação local, Docker e produção |
 | [docs/MANUAL_DE_USO.md](docs/MANUAL_DE_USO.md) | Passo a passo de cada tela |
 | [docs/INTEGRACAO_RECEITA_FEDERAL.md](docs/INTEGRACAO_RECEITA_FEDERAL.md) | O que existe oficialmente, requisitos e limites |
 | [docs/SEGURANCA_LGPD.md](docs/SEGURANCA_LGPD.md) | Controles de segurança e adequação à LGPD |
+| [docs/OPERACAO.md](docs/OPERACAO.md) | Rotina de backup, restauração e checklist de produção |
 | [docs/RELATORIO_DE_TESTES.md](docs/RELATORIO_DE_TESTES.md) | Resultado dos testes executados |
 
 ## Estrutura
@@ -110,9 +120,9 @@ monitor-tributario/
 │   │   ├── models/    19 modelos ORM
 │   │   ├── schemas/   contratos Pydantic
 │   │   └── services/  regras de negócio
-│   ├── alembic/       migrações
-│   ├── scripts/       seed e massa demonstrativa
-│   └── tests/         53 testes automatizados
+│   ├── alembic/       migrações (0001 estrutura, 0002 documentos, 0003 hardening)
+│   ├── scripts/       seed, massa demonstrativa, backup e restauração
+│   └── tests/         85 testes automatizados
 ├── frontend/          React 18 + TypeScript + Vite + Recharts
 ├── e2e/               teste de interface (Playwright) + capturas
 ├── data/              planilhas de teste e modelo de importação
@@ -129,8 +139,8 @@ cd backend && python3 -m pytest tests/ -v
 node e2e/fluxo-ui.mjs http://127.0.0.1:8000
 ```
 
-Resultado da última execução: **53 testes de backend** (SQLite e PostgreSQL 16) e
-**17 etapas de interface** — todos passando. Detalhes em
+Resultado da última execução: **85 testes de backend** (SQLite e PostgreSQL 16) e
+**25 etapas de interface** — todos passando. Detalhes em
 [docs/RELATORIO_DE_TESTES.md](docs/RELATORIO_DE_TESTES.md).
 
 ## Licença e uso
